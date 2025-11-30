@@ -1,143 +1,215 @@
-import React, { createContext, useState, useEffect, useRef } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import api from '../api/axios';
+import { useAuth } from './AuthContext';
 
 const CartContext = createContext();
 
+export const useCart = () => useContext(CartContext);
 
 export const CartProvider = ({ children }) => {
+  const { isLoggedIn } = useAuth();
   const [cart, setCart] = useState([]);
-  // Mini-carrito UI state
   const [isCartOpen, setIsCartOpen] = useState(false);
-  // Toast state
   const [toast, setToast] = useState({ visible: false, message: '' });
   const toastTimer = useRef(null);
 
+  // Helper para validar IDs de MongoDB
+  const isMongoId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id));
+
+  // --- LÓGICA DE CARGA INICIAL ---
+  useEffect(() => {
+    const loadCart = async () => {
+      if (isLoggedIn) {
+        // MODO CONECTADO: Cargar desde Backend
+        try {
+          const response = await api.get('/cart');
+          const remoteCart = response.data.data;
+
+          // Mapeamos la respuesta del backend a la estructura del frontend
+          const mappedItems = remoteCart.items.map(item => {
+             if (!item.productId) return null;
+             return {
+              id: item.productId._id,
+              nombre: item.productId.name,
+              precio: item.productId.price,
+              imagen: item.productId.images?.[0]?.url || "https://placehold.co/100x100?text=Sin+Foto",
+              cantidad: item.quantity,
+              fromBackend: true
+            };
+          }).filter(Boolean);
+
+          // Combinamos con items locales que NO sean del backend (los estáticos)
+          setCart(prev => {
+             const localStaticItems = prev.filter(p => !isMongoId(p.id));
+             return [...mappedItems, ...localStaticItems];
+          });
+
+        } catch (error) {
+          console.error("Error cargando carrito remoto:", error);
+        }
+      } else {
+        // MODO INVITADO: Cargar desde LocalStorage
+        const raw = localStorage.getItem('carrito');
+        if (raw) {
+          try {
+            setCart(JSON.parse(raw));
+          } catch {
+            setCart([]);
+          }
+        }
+      }
+    };
+
+    loadCart();
+  }, [isLoggedIn]);
+
+  // Persistencia en LocalStorage (Solo para invitados o respaldo)
+  useEffect(() => {
+    if (!isLoggedIn) {
+      localStorage.setItem('carrito', JSON.stringify(cart));
+    }
+  }, [cart, isLoggedIn]);
+
+
+  // --- FUNCIONES DE ACCIÓN ---
+
+  const addToCart = async (producto, cantidad = 1, imagenManual) => {
+    // 1. Validamos si es un producto real (del backend)
+    // Miramos si trae la flag explícita 'isBackend' (de allProducts) o 'fromBackend' (de la BD)
+    // O si el ID cumple con el formato de MongoDB (24 caracteres)
+    const esProductoReal = producto.isBackend || producto.fromBackend || isMongoId(producto.id);
+
+    // 2. Actualización Optimista
+    const newCart = [...cart];
+    const existingIdx = newCart.findIndex(item => item.id === producto.id);
+
+    if (existingIdx >= 0) {
+      newCart[existingIdx].cantidad += cantidad;
+      // Aseguramos que mantenga la flag si ya existía
+      if (esProductoReal) newCart[existingIdx].fromBackend = true;
+    } else {
+      newCart.push({
+        id: producto.id,
+        nombre: producto.nombre || producto.name,
+        precio: Number(producto.precio || producto.price),
+        imagen: imagenManual || producto.imagen || "https://placehold.co/100x100",
+        cantidad: cantidad,
+        fromBackend: esProductoReal // <--- ¡ESTA LÍNEA ERA LA QUE FALTABA!
+      });
+    }
+
+    setCart(newCart);
+    setIsCartOpen(true);
+    showToast('Agregado al carrito');
+
+    // 3. Sincronización con Backend
+    if (isLoggedIn && esProductoReal) {
+      try {
+        await api.post('/cart/items', {
+          productId: producto.id,
+          quantity: cantidad
+        });
+      } catch (error) {
+        console.error("Error sincronizando add:", error);
+      }
+    }
+  };
+
+  const removeFromCart = async (indexOrId) => {
+    let itemToRemove = null;
+    let newCart = [...cart];
+
+    if (typeof indexOrId === 'number') {
+        itemToRemove = newCart[indexOrId];
+        newCart.splice(indexOrId, 1);
+    } else {
+        itemToRemove = newCart.find(i => i.id === indexOrId);
+        newCart = newCart.filter(i => i.id !== indexOrId);
+    }
+
+    if (!itemToRemove) return;
+    setCart(newCart);
+
+    if (isLoggedIn && isMongoId(itemToRemove.id)) {
+      try {
+        await api.delete(`/cart/items/${itemToRemove.id}`);
+      } catch (error) {
+        console.error("Error eliminando item:", error);
+      }
+    }
+  };
+
+  const increaseQuantity = async (index) => {
+    const newCart = [...cart];
+    const item = newCart[index];
+    if (!item) return;
+
+    item.cantidad += 1;
+    setCart(newCart);
+
+    if (isLoggedIn && isMongoId(item.id)) {
+      try {
+        await api.put(`/cart/items/${item.id}`, {
+          quantity: item.cantidad
+        });
+      } catch (error) {
+        console.error("Error incrementando:", error);
+      }
+    }
+  };
+
+  const decreaseQuantity = async (index) => {
+    const newCart = [...cart];
+    const item = newCart[index];
+    if (!item) return;
+
+    if (item.cantidad > 1) {
+      item.cantidad -= 1;
+      setCart(newCart);
+
+      if (isLoggedIn && isMongoId(item.id)) {
+        try {
+          await api.put(`/cart/items/${item.id}`, {
+            quantity: item.cantidad
+          });
+        } catch (error) {
+          console.error("Error decrementando:", error);
+        }
+      }
+    } else {
+      removeFromCart(index);
+    }
+  };
+
+  const clearCart = async () => {
+    setCart([]);
+    showToast('Carrito vaciado');
+
+    if (isLoggedIn) {
+      try {
+        await api.delete('/cart');
+      } catch (error) {
+        console.error("Error vaciando carrito remoto:", error);
+      }
+    }
+  };
+
+  const getTotal = () => cart.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+  const getQuantity = () => cart.reduce((acc, item) => acc + item.cantidad, 0);
+
   const openCart = () => setIsCartOpen(true);
   const closeCart = () => setIsCartOpen(false);
-  const toggleCart = () => setIsCartOpen(v => !v);
+  const toggleCart = () => setIsCartOpen(prev => !prev);
 
-  useEffect(() => {
-    const raw = localStorage.getItem('carrito');
-    let storedCart = [];
-    try {
-      storedCart = raw ? JSON.parse(raw) : [];
-    } catch {
-      storedCart = [];
-    }
-
-    // Normalize legacy shapes to { nombre: string, precio: number, cantidad: number }
-    const normalizeItem = (it) => {
-      if (!it || typeof it !== 'object') return null;
-
-      // Case: full product shape in English with quantity
-      if ('name' in it && 'price' in it) {
-        return {
-          nombre: String(it.name ?? 'Sin nombre'),
-          precio: Number(it.price ?? 0) || 0,
-          cantidad: Number(it.quantity ?? it.cantidad ?? 1) || 1,
-        };
-      }
-
-      // Case: expected shape but nombre accidentally an object
-      if (typeof it.nombre === 'object' && it.nombre) {
-        return {
-          nombre: String(it.nombre.name ?? it.nombre.nombre ?? 'Sin nombre'),
-          precio: Number(it.precio ?? it.nombre.price ?? 0) || 0,
-          cantidad: Number(it.cantidad ?? it.quantity ?? 1) || 1,
-        };
-      }
-
-      // Default expected shape in Spanish
-      return {
-        nombre: String(it.nombre ?? 'Sin nombre'),
-        precio: Number(it.precio ?? 0) || 0,
-        cantidad: Number(it.cantidad ?? it.quantity ?? 1) || 1,
-      };
-    };
-
-    const normalized = Array.isArray(storedCart)
-      ? storedCart.map(normalizeItem).filter(Boolean)
-      : [];
-
-    setCart(normalized);
-    localStorage.setItem('carrito', JSON.stringify(normalized));
-  }, []);
-
-  // Clear toast timer on unmount
-  useEffect(() => {
-    return () => {
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-    };
-  }, []);
-
-  const saveCart = (newCart) => {
-    setCart(newCart);
-    localStorage.setItem('carrito', JSON.stringify(newCart));
-  };
-
-  const addToCart = (nombre, precio, imagen) => {
-    const newCart = [...cart];
-    const idx = newCart.findIndex(item => item.nombre === nombre && item.precio === precio);
-    if (idx !== -1) {
-      newCart[idx].cantidad += 1;
-    } else {
-      const entry = { nombre: String(nombre), precio: Number(precio) || 0, cantidad: 1 };
-      if (imagen) entry.imagen = imagen;
-      newCart.push(entry);
-    }
-    saveCart(newCart);
-    // Abrir mini-carrito al agregar
-    setIsCartOpen(true);
-    // Mostrar toast
-    showToast('Agregado al carrito');
-  };
-
-  const removeFromCart = (idx) => {
-    const newCart = [...cart];
-    newCart.splice(idx, 1);
-    saveCart(newCart);
-  };
-
-  const clearCart = () => {
-    saveCart([]);
-    showToast('Carrito vaciado');
-  };
-
-  const increaseQuantity = (idx) => {
-    const newCart = [...cart];
-    newCart[idx].cantidad += 1;
-    saveCart(newCart);
-  };
-
-  const decreaseQuantity = (idx) => {
-    const newCart = [...cart];
-    if (newCart[idx].cantidad > 1) {
-      newCart[idx].cantidad -= 1;
-    } else {
-      newCart.splice(idx, 1);
-    }
-    saveCart(newCart);
-  };
-
-  const getTotal = () => {
-    return cart.reduce((total, item) => total + item.precio * item.cantidad, 0);
-  };
-
-  const getQuantity = () => {
-    return cart.reduce((total, item) => total + item.cantidad, 0);
-  };
-
-  const showToast = (message, duration = 1800) => {
+  const showToast = (msg) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast({ visible: true, message });
+    setToast({ visible: true, message: msg });
     toastTimer.current = setTimeout(() => {
       setToast({ visible: false, message: '' });
-    }, duration);
+    }, 2000);
   };
-
-  const closeToast = () => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast({ visible: false, message: '' });
-  };
+  const closeToast = () => setToast({ visible: false, message: '' });
 
   return (
     <CartContext.Provider value={{
@@ -146,18 +218,15 @@ export const CartProvider = ({ children }) => {
       removeFromCart,
       increaseQuantity,
       decreaseQuantity,
+      clearCart,
       getTotal,
       getQuantity,
-      // Mini-carrito state/control
       isCartOpen,
       openCart,
       closeCart,
       toggleCart,
-      // Toast
       toast,
-      closeToast,
-      // Actions
-      clearCart
+      closeToast
     }}>
       {children}
     </CartContext.Provider>

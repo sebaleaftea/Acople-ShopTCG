@@ -4,24 +4,23 @@ import { useCart } from "../contexts/useCart";
 
 const CardPreview = ({ card }) => {
   const { addToCart } = useCart();
-  // Soporta ambos formatos de objeto
+  
+  // Normalización de datos para visualización
   const nombre = card.nombre || card.name || "Sin nombre";
-  const imagen = card.imagen || card.image || "";
-  const precio = card.precio || card.price || 0;
+  const imagen = card.imagen || card.image || "https://placehold.co/300x400?text=No+Image";
+  const precio = Number(card.precio || card.price || 0);
   const rareza = card.rareza || card.rarity || "-";
   const edicion = card.edicion || card.edition || "-";
 
-  // Dummy discount logic: if id contains 'black' or 'blue', show discount
-  const hasDiscount = card.id && (card.id.includes('black') || card.id.includes('blue'));
+  // Lógica visual de descuentos
+  const hasDiscount = card.id && (String(card.id).includes('black') || String(card.id).includes('blue'));
   const discountPercent = hasDiscount ? 20 : 0;
   const oldPrice = hasDiscount ? Math.round(precio * 1.25) : null;
-  const currentPrice = precio;
 
   const handleAddToCart = () => {
-    // Para distinguir por juego si existe
-    const categoria = card.game || card.category;
-    const displayName = categoria ? `${nombre} (${categoria})` : nombre;
-    addToCart(displayName, Number(currentPrice) || 0, imagen);
+    // CORRECCIÓN: Enviamos el objeto 'card' completo al contexto
+    // Esto asegura que el ID, el precio y el nombre lleguen juntos
+    addToCart(card); 
   };
 
   return (
@@ -40,7 +39,7 @@ const CardPreview = ({ card }) => {
       <p>Edición: {edicion}</p>
       <p>Rareza: {rareza}</p>
       <div className="price">
-        <span className="current">${currentPrice ? currentPrice.toLocaleString() : "-"}</span>
+        <span className="current">${precio.toLocaleString()}</span>
         {oldPrice && <span className="old">${oldPrice.toLocaleString()}</span>}
       </div>
       <div className="stars">★★★★☆</div>

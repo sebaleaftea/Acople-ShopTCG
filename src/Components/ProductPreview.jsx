@@ -2,27 +2,26 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../contexts/useCart";
 
-// Vista de producto genérico pensada para Accesorios
-// Acepta `product` o `producto`
 const ProductPreview = (props) => {
   const { addToCart } = useCart();
 
   const item = props.product || props.producto || {};
 
+  // Normalización de datos
   const nombre = item.nombre || item.name || "Sin nombre";
-  const imagen = item.imagen || item.image || "";
-  const precio = item.precio ?? item.price ?? 0;
+  const imagen = item.imagen || item.image || "https://placehold.co/300x400?text=No+Image";
+  const precio = Number(item.precio ?? item.price ?? 0);
   const categoria = item.category || item.categoria || (item.productType === 'accesorio' ? (item.category || 'accesorio') : undefined);
 
-  // Dummy discount logic: if category is 'dados' or 'portamazos', show discount
+  // Lógica visual de descuentos
   const hasDiscount = categoria && (categoria === 'dados' || categoria === 'portamazos');
   const discountPercent = hasDiscount ? 15 : 0;
   const oldPrice = hasDiscount ? Math.round(precio * 1.18) : null;
-  const currentPrice = precio;
 
   const handleAddToCart = () => {
-    const displayName = categoria ? `${nombre} (${categoria})` : nombre;
-    addToCart(displayName, Number(currentPrice) || 0, imagen);
+    // CORRECCIÓN: Enviamos el objeto 'item' completo
+    // El contexto se encargará de extraer el ID y validar si es backend
+    addToCart(item);
   };
 
   const isAccessory = (item.productType || item.type) === 'accesorio' || (!!categoria && categoria !== 'single');
@@ -43,7 +42,7 @@ const ProductPreview = (props) => {
       </Link>
       {categoria && <p>Categoría: {categoria}</p>}
       <div className="price">
-        <span className="current">${currentPrice ? Number(currentPrice).toLocaleString() : "-"}</span>
+        <span className="current">${precio.toLocaleString()}</span>
         {oldPrice && <span className="old">${oldPrice.toLocaleString()}</span>}
       </div>
       <div className="stars">★★★★☆</div>
