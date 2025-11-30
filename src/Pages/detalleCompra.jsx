@@ -1,11 +1,18 @@
 import React, { useState } from "react";
 import { useCart } from "../contexts/useCart";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
+import { useAuth } from "../contexts/AuthContext"; // Importar Auth
+import api from "../api/axios"; // Importar API
+import { useLoading } from "../contexts/useLoading"; // UI Feedback
 import "../styles/home.css";
 
 const DetalleCompra = () => {
-    const { cart, increaseQuantity, decreaseQuantity, removeFromCart, getTotal } = useCart();
+    const { cart, increaseQuantity, decreaseQuantity, removeFromCart, getTotal, clearCart } = useCart();
+    const { user } = useAuth();
+    const navigate = useNavigate();
+    const { showLoading } = useLoading();
+
     const [deliveryMethod, setDeliveryMethod] = useState('pickup');
     const [paymentMethod, setPaymentMethod] = useState('mercadopago');
     const [installments, setInstallments] = useState(1);
@@ -18,10 +25,68 @@ const DetalleCompra = () => {
     const taxes = Math.round(total * 0.19);
     const finalTotal = total + shipping + taxes;
 
-    const onSubmit = (data) => {
-        // Handle checkout submission
-        console.log('Checkout data:', { ...data, cart, deliveryMethod, paymentMethod, installments, promoCode });
-        alert('Compra procesada exitosamente!');
+    const onSubmit = async (data) => {
+        // 1. Validación de Sesión
+        if (!user) {
+            alert('Debes iniciar sesión para procesar la compra.');
+            // Opcional: abrir modal de login aquí
+            return;
+        }
+
+        // 2. Validación de Productos Reales (Backend)
+        // Filtramos items que tengan ID de MongoDB (24 chars) o flag fromBackend
+        const hasBackendItems = cart.some(i => i.fromBackend || (i.id && i.id.length === 24));
+        
+        if (!hasBackendItems && cart.length > 0) {
+            alert("Tu carrito solo contiene productos 'Demo' (estáticos) que no existen en el servidor. \n\nPor favor, agrega productos reales creados desde el Panel de Admin para probar el checkout.");
+            return;
+        }
+
+        if (cart.length === 0) {
+            alert("El carrito está vacío.");
+            return;
+        }
+
+        // 3. Procesar Orden
+        showLoading({ message: "Procesando tu compra...", duration: 10000 }); // Loader manual
+
+        try {
+            // Payload (aunque el backend actual ignora shippingAddress, lo enviamos por consistencia)
+            const orderPayload = {
+                deliveryMethod,
+                paymentMethod,
+                shippingAddress: deliveryMethod === 'delivery' ? {
+                    fullName: data.fullName,
+                    email: data.email,
+                    address: data.address,
+                    city: data.city,
+                    zipCode: data.zipCode,
+                    phone: data.phone
+                } : null,
+                notes: `Pago con ${paymentMethod} - ${installments} cuotas`
+            };
+
+            // Llamada al Backend: POST /orders
+            // Esto tomará los items del carrito EN LA BD y creará la orden
+            const response = await api.post('/orders', orderPayload);
+
+            if (response.status === 201) {
+                // Éxito
+                await clearCart(); // Limpiar estado local y remoto (aunque el backend ya limpió el remoto)
+                
+                showLoading({ message: "¡Compra exitosa! Redirigiendo...", duration: 2000 });
+                setTimeout(() => {
+                    navigate('/perfil'); // Enviar a "Mis Pedidos" (Perfil)
+                }, 2000);
+            }
+
+        } catch (error) {
+            console.error('Error en checkout:', error);
+            // Manejo de errores específicos del backend
+            const msg = error.response?.data?.message || 'Hubo un error al procesar tu pedido.';
+            alert(`Error: ${msg}`);
+            showLoading({ active: false }); // Ocultar loader inmediatamente si falla
+        }
     };
 
     return (
@@ -193,7 +258,9 @@ const DetalleCompra = () => {
                             )}
                         </section>
 
-                        <button type="submit" className="pay-now-btn">Pagar Ahora</button>
+                        <button type="submit" className="pay-now-btn">
+                            {user ? `Pagar $${finalTotal.toLocaleString()}` : "Inicia Sesión para Pagar"}
+                        </button>
                     </form>
                 </div>
 
@@ -212,6 +279,12 @@ const DetalleCompra = () => {
                                         <div className="order-item-details">
                                             <h4 className="order-item-name">{String(item.nombre)}</h4>
                                             <span className="order-item-price">${Number(item.precio || 0).toLocaleString()} CLP</span>
+                                            
+                                            {/* Indicador de si el item es del backend o demo */}
+                                            {!item.fromBackend && !item.id?.match(/^[0-9a-fA-F]{24}$/) && (
+                                                <small style={{color: 'orange', fontSize: '0.75rem'}}>*Item Demo (No se procesará)</small>
+                                            )}
+
                                             <div className="order-item-controls">
                                                 <button onClick={() => decreaseQuantity(idx)} className="qty-btn">-</button>
                                                 <span className="qty">{Number(item.cantidad) || 0}</span>
@@ -244,7 +317,7 @@ const DetalleCompra = () => {
                                 <span>${shipping.toLocaleString()} CLP</span>
                             </div>
                             <div className="breakdown-item">
-                                <span>Impuestos</span>
+                                <span>Impuestos (19%)</span>
                                 <span>${taxes.toLocaleString()} CLP</span>
                             </div>
                             <div className="breakdown-total">

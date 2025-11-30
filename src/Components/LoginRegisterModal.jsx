@@ -12,7 +12,10 @@ const LoginRegisterModal = ({ isOpen, onClose }) => {
     name: ''
   });
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  
+  // 1. Importamos 'register' además de 'login' desde el AuthContext actualizado
+  const { login, register } = useAuth();
+  
   const navigate = useNavigate();
   const { showLoading } = useLoading();
 
@@ -24,64 +27,52 @@ const LoginRegisterModal = ({ isOpen, onClose }) => {
     setError('');
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     if (!formData.email || !formData.password) {
       setError('Por favor completa todos los campos');
       return;
     }
 
-    const success = login(formData.email, formData.password);
+    // 2. Usamos la función login del contexto (ahora es async)
+    // El backend devuelve éxito o fallo, ya no necesitamos lógica de admin aquí si el contexto la maneja
+    // (Aunque puedes mantener la redirección específica si lo prefieres)
+    const success = await login(formData.email, formData.password);
+    
     if (success) {
-      const email = formData.email.toLowerCase();
-      const isAdminQuick = email === 'admin@admin.cl' && formData.password === 'admin';
-
-      if (isAdminQuick) {
-        localStorage.setItem('adminAuthed', 'true');
-        showLoading({ message: 'Entrando al panel...', duration: 5000 });
-        onClose();
-        setFormData({ email: '', password: '', name: '' });
-        navigate('/admin');
-        return;
+      // Verificamos si es admin directamente desde el email (o usando la propiedad isAdmin del contexto si la expusiste)
+      if (formData.email.toLowerCase() === 'admin@admin.cl') {
+          showLoading({ message: 'Entrando al panel...', duration: 5000 });
+          navigate('/admin');
+      } else {
+          showLoading({ message: 'Iniciando sesión...', duration: 2000 });
+          navigate('/perfil');
       }
-
-      showLoading({ message: 'Cargando...', duration: 5000 });
       onClose();
       setFormData({ email: '', password: '', name: '' });
-      navigate('/perfil');
-    } else {
-      setError('Credenciales inválidas');
     }
+    // Si falla, el AuthContext ya muestra un alert, o puedes setear error aquí si el login retornara el mensaje.
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     if (!formData.email || !formData.password || !formData.name) {
       setError('Por favor completa todos los campos');
       return;
     }
 
-    // For now, registration is the same as login (simulated)
-    const success = login(formData.email, formData.password);
+    // 3. CAMBIO CLAVE: Usamos la función 'register' real del contexto
+    // Pasamos los argumentos individuales como definimos en el AuthContext
+    const success = await register(formData.name, formData.email, formData.password);
+
     if (success) {
-      const email = formData.email.toLowerCase();
-      const isAdminQuick = email === 'admin@admin.cl' && formData.password === 'admin';
-
-      if (isAdminQuick) {
-        localStorage.setItem('adminAuthed', 'true');
-        showLoading({ message: 'Entrando al panel...', duration: 5000 });
-        onClose();
-        setFormData({ email: '', password: '', name: '' });
-        navigate('/admin');
-        return;
-      }
-
-      showLoading({ message: 'Cargando...', duration: 5000 });
+      showLoading({ message: 'Cuenta creada con éxito...', duration: 2000 });
       onClose();
       setFormData({ email: '', password: '', name: '' });
       navigate('/perfil');
     } else {
-      setError('Error en el registro');
+      // El AuthContext maneja el alert de error, pero podrías poner un mensaje genérico aquí
+      setError('No se pudo crear la cuenta. Intenta con otro email.');
     }
   };
 

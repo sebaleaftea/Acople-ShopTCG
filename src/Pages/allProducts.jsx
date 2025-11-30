@@ -1,10 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import Filter from "../Components/Filter";
 import CardPreview from "../Components/CardPreview";
 import ProductPreview from "../Components/ProductPreview";
-import { allProducts } from "../data/products";
+import api from "../api/axios";
 import '../styles/magicSingles.css';
+
+// 1. Importamos los datos estáticos para usarlos como respaldo/demo
+import { allProducts as staticProducts } from "../data/products";
 
 const normalizeType = (t) => {
   const v = (t || '').toLowerCase();
@@ -14,86 +17,109 @@ const normalizeType = (t) => {
   return 'all';
 };
 
-const getItemType = (item) => (item?.productType || item?.type || '').toLowerCase();
-const getItemPrice = (p) => Number(p.precio ?? p.price ?? 0);
-const getItemGame = (p) => (p.game ?? '').toString().toLowerCase();
-const getItemCategory = (p) => (p.category ?? p.categoria ?? '').toString().toLowerCase();
-const getItemRarity = (p) => (p.rareza ?? p.rarity ?? '').toString().toLowerCase();
-const getItemText = (p) => [p.nombre, p.name, p.descripcion, p.description, p.category, p.categoria, p.game]
-  .filter(Boolean).map(String).join(' ').toLowerCase();
-
 const AllProducts = () => {
-  const [filtered, setFiltered] = useState(allProducts);
+  // 2. Inicializamos el estado CON los productos estáticos
+  const [products, setProducts] = useState(staticProducts);
+  const [filtered, setFiltered] = useState(staticProducts);
+  
+  const [isLoading, setIsLoading] = useState(true); 
   const [showFilters, setShowFilters] = useState(false);
+  
+  // CORRECCIÓN 1: Quitamos setSearchParams que no se usaba
   const [searchParams] = useSearchParams();
 
-  const handleFilter = (filters) => {
-    let items = allProducts.slice();
+  useEffect(() => {
+    const fetchProducts = async () => {
+      // No activamos loading aquí para no ocultar los estáticos
+      try {
+        const response = await api.get('/products?limit=100&isActive=true');
+        
+        const backendProducts = response.data.data.products.map(p => ({
+          id: p._id,
+          nombre: p.name,
+          precio: p.price,
+          stock: p.stock,
+          descripcion: p.description,
+          imagen: p.images && p.images.length > 0 ? p.images[0].url : "https://placehold.co/300x400?text=Sin+Imagen",
+          
+          // Datos ficticios de compatibilidad
+          productType: 'single', 
+          game: 'magic', 
+          category: 'general',
+          rareza: 'Rara',
+          edicion: 'Core Set',
+          isBackend: true 
+        }));
 
-    // Tipo de producto
+        const combinedProducts = [...backendProducts, ...staticProducts];
+        setProducts(combinedProducts);
+        
+      } catch (error) {
+        console.error("Error conectando con API, mostrando solo estáticos:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  // CORRECCIÓN 2: Envolvemos handleFilter en useCallback
+  const handleFilter = useCallback((filters) => {
+    let items = products.slice();
+
     const t = normalizeType(filters.productType || 'all');
     if (t !== 'all') {
-      items = items.filter(i => getItemType(i) === t);
+      items = items.filter(i => (i.productType || '').toLowerCase() === t);
     }
 
-    // Juego para singles
     if (filters.game && filters.game !== 'all') {
       const g = (filters.game || '').toLowerCase();
-      items = items.filter(i => (getItemType(i) === 'single') && (getItemGame(i) === g));
+      items = items.filter(i => (i.game || '').toLowerCase() === g);
     }
 
-    // Categoría para accesorios
     if (filters.category && filters.category !== 'all') {
       const c = (filters.category || '').toLowerCase();
-      items = items.filter(i => (getItemType(i) === 'accesorio') && (getItemCategory(i) === c));
+      items = items.filter(i => (i.category || '').toLowerCase() === c);
     }
 
-    // Rareza en singles
-    if (filters.rarity && filters.rarity !== 'all') {
-      const rfil = (filters.rarity || '').toLowerCase();
-      items = items.filter(i => getItemType(i) === 'single' && getItemRarity(i) === rfil);
-    }
-
-    // Búsqueda libre (nombre/desc/categoría/juego)
-    if (filters.query) {
-      const q = (filters.query || '').toLowerCase();
-      items = items.filter(i => getItemText(i).includes(q));
-    }
-
-    // Precios
     if (filters.minPrice !== undefined && filters.minPrice !== '') {
-      items = items.filter(i => getItemPrice(i) >= Number(filters.minPrice));
+      items = items.filter(i => Number(i.precio) >= Number(filters.minPrice));
     }
     if (filters.maxPrice !== undefined && filters.maxPrice !== '') {
-      items = items.filter(i => getItemPrice(i) <= Number(filters.maxPrice));
+      items = items.filter(i => Number(i.precio) <= Number(filters.maxPrice));
+    }
+    
+    if (filters.query) {
+      const q = filters.query.toLowerCase();
+      items = items.filter(i => (i.nombre || '').toLowerCase().includes(q));
     }
 
-    // Orden
     if (filters.priceOrder === 'asc') {
-      items = [...items].sort((a, b) => getItemPrice(a) - getItemPrice(b));
+      items.sort((a, b) => a.precio - b.precio);
     } else if (filters.priceOrder === 'desc') {
-      items = [...items].sort((a, b) => getItemPrice(b) - getItemPrice(a));
+      items.sort((a, b) => b.precio - a.precio);
     }
 
     setFiltered(items);
-  };
+  }, [products]); // Se recrea solo si cambian los productos
 
-  // Reaccionar a cambios en URL (soporta Home -> /all-products?query=...)
   const urlFilters = useMemo(() => {
-    const productType = normalizeType(searchParams.get('productType') || 'all');
-    const game = (searchParams.get('game') || 'all').toLowerCase();
-    const category = (searchParams.get('category') || 'all').toLowerCase();
-    const rarity = (searchParams.get('rarity') || 'all').toLowerCase();
-    const minPrice = searchParams.get('minPrice') ?? '';
-    const maxPrice = searchParams.get('maxPrice') ?? '';
-    const priceOrder = (searchParams.get('priceOrder') || '').toLowerCase();
-    const query = (searchParams.get('query') || '').toLowerCase();
-    return { productType, game, category, rarity, minPrice, maxPrice, priceOrder, query };
+    return {
+      productType: searchParams.get('productType') || 'all',
+      game: searchParams.get('game') || 'all',
+      category: searchParams.get('category') || 'all',
+      minPrice: searchParams.get('minPrice') || '',
+      maxPrice: searchParams.get('maxPrice') || '',
+      priceOrder: searchParams.get('priceOrder') || '',
+      query: searchParams.get('query') || '',
+    };
   }, [searchParams]);
 
+  // CORRECCIÓN 3: Agregamos handleFilter a las dependencias
   useEffect(() => {
     handleFilter(urlFilters);
-  }, [urlFilters]);
+  }, [urlFilters, handleFilter]);
 
   return (
     <div>
@@ -111,7 +137,9 @@ const AllProducts = () => {
           >
             Mostrar Filtros
           </button>
-          <h2>Resultados</h2>
+          
+          <h2>Resultados ({filtered.length})</h2>
+          
           <div className="cards-grid">
             {filtered.map(item => (
               item.productType === 'single' ? (
@@ -121,21 +149,19 @@ const AllProducts = () => {
               )
             ))}
           </div>
+
+          {filtered.length === 0 && !isLoading && (
+             <p style={{textAlign: 'center', width: '100%'}}>No se encontraron productos.</p>
+          )}
         </section>
       </main>
 
-      {/* Mobile Filter Modal */}
       {showFilters && (
         <div className="mobile-filter-modal-overlay" onClick={() => setShowFilters(false)}>
           <div className="mobile-filter-modal" onClick={(e) => e.stopPropagation()}>
             <div className="mobile-filter-header">
               <h3>Filtros</h3>
-              <button
-                className="mobile-filter-close"
-                onClick={() => setShowFilters(false)}
-              >
-                ✕
-              </button>
+              <button className="mobile-filter-close" onClick={() => setShowFilters(false)}>✕</button>
             </div>
             <div className="mobile-filter-content">
               <Filter onFilter={handleFilter} mode="all" showSearch={true} />
