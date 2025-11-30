@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import api from '../api/axios';
+import api from '../Api/axios';
 import { useAuth } from './AuthContext';
 
 const CartContext = createContext();

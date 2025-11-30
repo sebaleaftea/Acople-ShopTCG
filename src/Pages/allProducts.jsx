@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import Filter from "../Components/Filter";
 import CardPreview from "../Components/CardPreview";
 import ProductPreview from "../Components/ProductPreview";
-import api from "../api/axios";
+import api from "../Api/axios";
 import '../styles/magicSingles.css';
 
 // 1. Importamos los datos estáticos para usarlos como respaldo/demo

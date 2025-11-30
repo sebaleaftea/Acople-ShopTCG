@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import api from '../api/axios'; // Importamos el cliente API
+import api from '../Api/axios'; // Importamos el cliente API
 import '../styles/admin.css';
 import '../styles/home.css';
 
