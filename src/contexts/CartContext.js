@@ -16,26 +16,26 @@ export const CartProvider = ({ children }) => {
     return item.fromBackend || (item.id && !isNaN(Number(item.id)));
   };
 
-  // --- 1. CARGA INICIAL (Con Logs de Depuración) ---
+  // --- 1. CARGA INICIAL ---
   useEffect(() => {
     const loadCart = async () => {
-      // Verificamos explícitamente que el ID sea válido antes de llamar
-      if (isLoggedIn && user && user.id) {
-        console.log("🛒 Intentando cargar carrito para User ID:", user.id);
-        
+      // Intentamos obtener el ID del usuario de dos fuentes
+      const storageUser = JSON.parse(localStorage.getItem('acople-user') || '{}');
+      const activeUserId = user?.id || storageUser?.id;
+
+      console.log("🕵️‍♂️ [CartContext] ID de usuario detectado:", activeUserId);
+
+      if (activeUserId) {
         try {
-          // CAMBIO CLAVE: Usamos 'params' para que Axios construya la URL segura
-          // Esto evita errores si el ID es string o número
+          console.log(`📡 [GET] Solicitando carrito a: /cart?userId=${activeUserId}`);
           const response = await api.get('/cart', { 
-            params: { userId: user.id } 
+            params: { userId: activeUserId } 
           });
           
+          // ... lógica de mapeo exitosa (igual que antes) ...
           const remoteItems = response.data || [];
-
           const mappedRemoteItems = remoteItems.map(item => {
-             // Protección extra por si el producto es nulo en la BD
              if (!item.product) return null;
-             
              return {
                 id: item.product.id,
                 nombre: item.product.name,
@@ -52,33 +52,29 @@ export const CartProvider = ({ children }) => {
           });
 
         } catch (error) {
-          console.error("❌ Error cargando carrito remoto:", error);
-          // Si es 400, imprime detalles para depurar
-          if (error.response?.status === 400) {
-             console.error("Detalle del error 400:", error.response.data);
-          }
+          console.error("❌ Error cargando carrito:", error.message);
+          if (error.response) console.error("   Detalle:", error.response.data);
         }
       } else {
         // Carga local
         const raw = localStorage.getItem('carrito');
-        if (raw) {
-          try { setCart(JSON.parse(raw)); } catch { setCart([]); }
-        }
+        if (raw) try { setCart(JSON.parse(raw)); } catch { setCart([]); }
       }
     };
 
     loadCart();
-  }, [isLoggedIn, user]);
+  }, [isLoggedIn, user]); // Se ejecuta al loguearse
 
   // Persistencia local
   useEffect(() => {
-    if (!isLoggedIn) {
-      localStorage.setItem('carrito', JSON.stringify(cart));
-    }
+    if (!isLoggedIn) localStorage.setItem('carrito', JSON.stringify(cart));
   }, [cart, isLoggedIn]);
 
   // --- 2. AGREGAR AL CARRITO ---
   const addToCart = async (producto, cantidad = 1, imagenManual) => {
+    const storageUser = JSON.parse(localStorage.getItem('acople-user') || '{}');
+    const activeUserId = user?.id || storageUser?.id;
+
     const esReal = producto.isBackend || !isNaN(Number(producto.id));
 
     // Optimista
@@ -103,27 +99,30 @@ export const CartProvider = ({ children }) => {
     showToast('Agregado al carrito');
 
     // Sincronización
-    if (isLoggedIn && esReal) {
-      if (!user || !user.id) {
-         console.error("⚠️ No se puede sincronizar: Usuario sin ID");
-         return;
-      }
-
+    if (activeUserId && esReal) {
       try {
-        console.log("📤 Enviando al backend:", { userId: user.id, productId: producto.id, quantity: cantidad });
+        const payload = {
+          userId: parseInt(activeUserId, 10),
+          productId: parseInt(producto.id, 10),
+          quantity: parseInt(cantidad, 10)
+        };
         
-        await api.post('/cart/items', {
-          userId: user.id, // Axios enviará esto como JSON body correctamente
-          productId: producto.id,
-          quantity: cantidad
-        });
+        console.log("📤 [POST] Enviando item:", payload);
+        await api.post('/cart/items', payload);
+
       } catch (error) {
-        console.error("❌ Error sincronizando add:", error);
+        console.error("❌ Error agregando item:", error.message);
       }
+    } else if (!activeUserId) {
+        console.warn("⚠️ No se sincronizó porque no se encontró ID de usuario.");
     }
   };
 
-  // --- 3. ELIMINAR ---
+  // ... (Mantén el resto de funciones: removeFromCart, etc. igual que antes) ...
+  // Para abreviar, solo cambié la lógica de obtención del ID arriba.
+  
+  // ... Copia aquí el resto de tus funciones removeFromCart, increaseQuantity, decreaseQuantity, clearCart, getTotal...
+
   const removeFromCart = async (indexOrId) => {
     let itemToRemove = null;
     let newCart = [...cart];
@@ -138,25 +137,26 @@ export const CartProvider = ({ children }) => {
 
     if (!itemToRemove) return;
     setCart(newCart);
+    
+    const storageUser = JSON.parse(localStorage.getItem('acople-user') || '{}');
+    const activeUserId = user?.id || storageUser?.id;
 
-    if (isLoggedIn && itemToRemove.fromBackend && user?.id) {
+    if (activeUserId && itemToRemove.fromBackend) {
       try {
-        // DELETE con query param seguro
         await api.delete(`/cart/items/${itemToRemove.id}`, {
-            params: { userId: user.id }
+            params: { userId: activeUserId }
         });
-      } catch (error) {
-        console.error("Error eliminando item:", error);
-      }
+      } catch (error) { console.error(error); }
     }
   };
 
-  // --- 4. ACTUALIZAR CANTIDAD ---
   const updateQtyBackend = async (item, newQty) => {
-      if (isLoggedIn && item.fromBackend && user?.id) {
+      const storageUser = JSON.parse(localStorage.getItem('acople-user') || '{}');
+      const activeUserId = user?.id || storageUser?.id;
+      if (activeUserId && item.fromBackend) {
           try {
             await api.put(`/cart/items/${item.id}`, { quantity: newQty }, {
-                params: { userId: user.id }
+                params: { userId: activeUserId }
             });
           } catch (e) { console.error(e); }
       }
@@ -187,14 +187,14 @@ export const CartProvider = ({ children }) => {
   const clearCart = async () => {
       setCart([]);
       showToast('Carrito vaciado');
-      if (isLoggedIn && user?.id) {
-          try { 
-              await api.delete('/cart', { params: { userId: user.id } }); 
-          } catch (error) { console.error("Error vaciando carrito:", error); }
+      const storageUser = JSON.parse(localStorage.getItem('acople-user') || '{}');
+      const activeUserId = user?.id || storageUser?.id;
+      if (activeUserId) {
+          try { await api.delete('/cart', { params: { userId: activeUserId } }); } 
+          catch (error) { console.error(error); }
       }
   };
 
-  // Utilidades
   const getTotal = () => cart.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
   const getQuantity = () => cart.reduce((acc, item) => acc + item.cantidad, 0);
   const openCart = () => setIsCartOpen(true);
