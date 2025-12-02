@@ -3,12 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import Filter from "../Components/Filter";
 import CardPreview from "../Components/CardPreview";
 import ProductPreview from "../Components/ProductPreview";
-import api from "../Api/axios"; // Asegúrate que la mayúscula 'Api' coincide con tu carpeta real
-import { allProducts as staticProducts } from "../data/products";
+import { useProducts } from "../contexts/ProductContext"; // <-- 1. IMPORT
 import '../styles/magicSingles.css';
-
-// NUEVO: Importamos la magia
-import { getImageBySlug } from "../utils/imageMapper";
 
 const normalizeType = (t) => {
   const v = (t || '').toLowerCase();
@@ -19,47 +15,11 @@ const normalizeType = (t) => {
 };
 
 const AllProducts = () => {
-  const [products, setProducts] = useState(staticProducts);
-  const [filtered, setFiltered] = useState(staticProducts);
-  const [isLoading, setIsLoading] = useState(true);
+  const { products, isLoading } = useProducts(); 
+  
+  const [filtered, setFiltered] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const response = await api.get('/products');
-        
-        const backendProducts = response.data.map(p => ({
-          id: p.id,
-          nombre: p.name,
-          precio: p.price,
-          stock: p.stock,
-          descripcion: p.description,
-          
-          // NUEVO: Usamos el slug del backend para buscar la imagen local
-          // Si p.slug es "charizard", buscará "charizard.jpg" o "charizard.png" en tus assets
-          imagen: getImageBySlug(p.slug),
-          
-          // Mapeo de categorías (ajusta según tus datos reales)
-          productType: (p.category === 'Cartas' || p.game) ? 'single' : 'accesorio',
-          game: p.game || 'magic',
-          category: p.category || 'General',
-          
-          isBackend: true 
-        }));
-
-        setProducts([...backendProducts, ...staticProducts]);
-        
-      } catch (error) {
-        console.error("Error API Java:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, []);
 
   const handleFilter = useCallback((filters) => {
     let items = products.slice();
@@ -136,13 +96,17 @@ const AllProducts = () => {
           <h2>Resultados ({filtered.length})</h2>
           
           <div className="cards-grid">
-            {filtered.map(item => (
-              item.productType === 'single' ? (
-                <CardPreview key={item.id} card={item} />
-              ) : (
-                <ProductPreview key={item.id} product={item} />
-              )
-            ))}
+            {isLoading ? (
+              <p>Cargando productos...</p>
+            ) : (
+              filtered.map(item => (
+                item.productType === 'single' ? (
+                  <CardPreview key={item.id} card={item} />
+                ) : (
+                  <ProductPreview key={item.id} product={item} />
+                )
+              ))
+            )}
           </div>
 
           {filtered.length === 0 && !isLoading && (
