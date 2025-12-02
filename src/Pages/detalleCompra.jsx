@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import { useCart } from "../contexts/useCart";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { useAuth } from "../contexts/AuthContext"; // Importar Auth
-import api from "../Api/axios"; // Importar API
-import { useLoading } from "../contexts/useLoading"; // UI Feedback
+import { useAuth } from "../contexts/AuthContext";
+import api from "../Api/axios"; 
+import { useLoading } from "../contexts/useLoading";
 import "../styles/home.css";
 
 const DetalleCompra = () => {
@@ -27,15 +27,14 @@ const DetalleCompra = () => {
 
     const onSubmit = async (data) => {
         // 1. Validación de Sesión
-        if (!user) {
+        if (!user || !user.id) {
             alert('Debes iniciar sesión para procesar la compra.');
-            // Opcional: abrir modal de login aquí
             return;
         }
 
-        // 2. Validación de Productos Reales (Backend)
-        // Filtramos items que tengan ID de MongoDB (24 chars) o flag fromBackend
-        const hasBackendItems = cart.some(i => i.fromBackend || (i.id && i.id.length === 24));
+        // 2. Validación de Productos Reales (Backend Java)
+        // Verificamos si hay items que vengan del backend (flag fromBackend o ID numérico)
+        const hasBackendItems = cart.some(i => i.fromBackend || !isNaN(Number(i.id)));
         
         if (!hasBackendItems && cart.length > 0) {
             alert("Tu carrito solo contiene productos 'Demo' (estáticos) que no existen en el servidor. \n\nPor favor, agrega productos reales creados desde el Panel de Admin para probar el checkout.");
@@ -48,31 +47,20 @@ const DetalleCompra = () => {
         }
 
         // 3. Procesar Orden
-        showLoading({ message: "Procesando tu compra...", duration: 10000 }); // Loader manual
+        showLoading({ message: "Procesando tu compra...", duration: 5000 });
 
         try {
-            // Payload (aunque el backend actual ignora shippingAddress, lo enviamos por consistencia)
-            const orderPayload = {
-                deliveryMethod,
-                paymentMethod,
-                shippingAddress: deliveryMethod === 'delivery' ? {
-                    fullName: data.fullName,
-                    email: data.email,
-                    address: data.address,
-                    city: data.city,
-                    zipCode: data.zipCode,
-                    phone: data.phone
-                } : null,
-                notes: `Pago con ${paymentMethod} - ${installments} cuotas`
-            };
+            // BACKEND JAVA: POST /api/orders
+            // Espera un mapa con userId: { "userId": 123 }
+            // (El backend lee los items directamente de la tabla 'cart_item' en la BD)
+            
+            const response = await api.post('/orders', {
+                userId: user.id
+            });
 
-            // Llamada al Backend: POST /orders
-            // Esto tomará los items del carrito EN LA BD y creará la orden
-            const response = await api.post('/orders', orderPayload);
-
-            if (response.status === 201) {
+            if (response.status === 200 || response.status === 201) {
                 // Éxito
-                await clearCart(); // Limpiar estado local y remoto (aunque el backend ya limpió el remoto)
+                await clearCart(); // Limpiar estado local y remoto (backend también lo limpia, pero sincronizamos)
                 
                 showLoading({ message: "¡Compra exitosa! Redirigiendo...", duration: 2000 });
                 setTimeout(() => {
@@ -82,31 +70,11 @@ const DetalleCompra = () => {
 
         } catch (error) {
             console.error('Error en checkout:', error);
+            // Manejo de errores específicos del backend Java
+            // Java suele devolver un mensaje en error.response.data (si es string) o .message
+            const msg = error.response?.data?.message || error.response?.data || 'Hubo un error al procesar tu pedido.';
             
-            const status = error.response?.status;
-            const msg = error.response?.data?.message || '';
-
-            // --- MANEJO DE BUG DEL BACKEND (ERROR 409 - ORDER NUMBER) ---
-            // Si el servidor falla por duplicidad de ID (bug conocido), 
-            // simulamos el éxito para no bloquear al usuario.
-            if (status === 409 && (msg.includes('orderNumber') || msg.includes('duplicate'))) {
-                // 1. Fingimos que salió bien
-                showLoading({ message: "Nota: Backend saturado. Simulando compra exitosa...", duration: 3000 });
-                
-                // 2. Limpiamos el carrito local
-                await clearCart(); 
-                
-                // 3. Redirigimos
-                setTimeout(() => {
-                    alert("¡Compra procesada! (Modo Simulación por error de IDs en servidor compartido)");
-                    navigate('/perfil');
-                }, 3000);
-                return;
-            }
-            // -----------------------------------------------------------
-
-            const displayMsg = msg || 'Hubo un error al procesar tu pedido.';
-            alert(`Error: ${displayMsg}`);
+            alert(`Error: ${msg}`);
             showLoading({ active: false }); 
         }
     };
@@ -144,7 +112,7 @@ const DetalleCompra = () => {
                             </div>
                         </section>
 
-                        {/* Shipping Form */}
+                        {/* Shipping Form (Visual Only for Java Backend MVP) */}
                         {deliveryMethod === 'delivery' && (
                             <section className="checkout-section">
                                 <h2 className="section-title">Dirección de Envío</h2>
@@ -302,8 +270,8 @@ const DetalleCompra = () => {
                                             <h4 className="order-item-name">{String(item.nombre)}</h4>
                                             <span className="order-item-price">${Number(item.precio || 0).toLocaleString()} CLP</span>
                                             
-                                            {/* Indicador de si el item es del backend o demo */}
-                                            {!item.fromBackend && !item.id?.match(/^[0-9a-fA-F]{24}$/) && (
+                                            {/* Warning para items demo */}
+                                            {!item.fromBackend && isNaN(Number(item.id)) && (
                                                 <small style={{color: 'orange', fontSize: '0.75rem'}}>*Item Demo (No se procesará)</small>
                                             )}
 

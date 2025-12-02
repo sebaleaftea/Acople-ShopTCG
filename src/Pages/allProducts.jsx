@@ -1,13 +1,14 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import Filter from "../Components/Filter";
 import CardPreview from "../Components/CardPreview";
 import ProductPreview from "../Components/ProductPreview";
-import api from "../Api/axios";
+import api from "../Api/axios"; // Asegúrate que la mayúscula 'Api' coincide con tu carpeta real
+import { allProducts as staticProducts } from "../data/products";
 import '../styles/magicSingles.css';
 
-// 1. Importamos los datos estáticos para usarlos como respaldo/demo
-import { allProducts as staticProducts } from "../data/products";
+// NUEVO: Importamos la magia
+import { getImageBySlug } from "../utils/imageMapper";
 
 const normalizeType = (t) => {
   const v = (t || '').toLowerCase();
@@ -18,44 +19,40 @@ const normalizeType = (t) => {
 };
 
 const AllProducts = () => {
-  // 2. Inicializamos el estado CON los productos estáticos
   const [products, setProducts] = useState(staticProducts);
   const [filtered, setFiltered] = useState(staticProducts);
-  
-  const [isLoading, setIsLoading] = useState(true); 
+  const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
-  
-  // CORRECCIÓN 1: Quitamos setSearchParams que no se usaba
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     const fetchProducts = async () => {
-      // No activamos loading aquí para no ocultar los estáticos
       try {
-        const response = await api.get('/products?limit=100&isActive=true');
+        const response = await api.get('/products');
         
-        const backendProducts = response.data.data.products.map(p => ({
-          id: p._id,
+        const backendProducts = response.data.map(p => ({
+          id: p.id,
           nombre: p.name,
           precio: p.price,
           stock: p.stock,
           descripcion: p.description,
-          imagen: p.images && p.images.length > 0 ? p.images[0].url : "https://placehold.co/300x400?text=Sin+Imagen",
           
-          // Datos ficticios de compatibilidad
-          productType: 'single', 
-          game: 'magic', 
-          category: 'general',
-          rareza: 'Rara',
-          edicion: 'Core Set',
+          // NUEVO: Usamos el slug del backend para buscar la imagen local
+          // Si p.slug es "charizard", buscará "charizard.jpg" o "charizard.png" en tus assets
+          imagen: getImageBySlug(p.slug),
+          
+          // Mapeo de categorías (ajusta según tus datos reales)
+          productType: (p.category === 'Cartas' || p.game) ? 'single' : 'accesorio',
+          game: p.game || 'magic',
+          category: p.category || 'General',
+          
           isBackend: true 
         }));
 
-        const combinedProducts = [...backendProducts, ...staticProducts];
-        setProducts(combinedProducts);
+        setProducts([...backendProducts, ...staticProducts]);
         
       } catch (error) {
-        console.error("Error conectando con API, mostrando solo estáticos:", error);
+        console.error("Error API Java:", error);
       } finally {
         setIsLoading(false);
       }
@@ -64,7 +61,6 @@ const AllProducts = () => {
     fetchProducts();
   }, []);
 
-  // CORRECCIÓN 2: Envolvemos handleFilter en useCallback
   const handleFilter = useCallback((filters) => {
     let items = products.slice();
 
@@ -102,7 +98,7 @@ const AllProducts = () => {
     }
 
     setFiltered(items);
-  }, [products]); // Se recrea solo si cambian los productos
+  }, [products]);
 
   const urlFilters = useMemo(() => {
     return {
@@ -116,7 +112,6 @@ const AllProducts = () => {
     };
   }, [searchParams]);
 
-  // CORRECCIÓN 3: Agregamos handleFilter a las dependencias
   useEffect(() => {
     handleFilter(urlFilters);
   }, [urlFilters, handleFilter]);
