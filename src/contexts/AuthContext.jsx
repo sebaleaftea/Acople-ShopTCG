@@ -16,7 +16,6 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Al cargar la app, verificamos si hay una sesión guardada
   useEffect(() => {
     const storedUser = localStorage.getItem('acople-user');
     if (storedUser) {
@@ -30,50 +29,57 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(false);
   }, []);
 
-  // Función de Login conectada al Backend
-  const login = async (email, password) => {
+  // --- LOGIN ADAPTADO A JAVA ---
+  const login = async (emailOrUsername, password) => {
     try {
-      // Hacemos la petición POST al endpoint de tu backend
-      const response = await api.post('/auth/login', { email, password });
+      // CORRECCIÓN 1: Backend Java espera 'username', no 'email'.
+      // Mapeamos el input del usuario al campo 'username'.
+      const response = await api.post('/auth/login', { 
+        username: emailOrUsername, 
+        password 
+      });
 
-      // Tu backend devuelve la estructura: { data: { user: {...}, token: "..." } }
-      // Extraemos usuario y token
-      const { user: userData, token } = response.data.data;
+      // CORRECCIÓN 2: Backend Java devuelve el objeto User directamente.
+      // No hay 'data.data' ni 'token'.
+      const userData = response.data;
 
-      // Combinamos los datos del usuario con el token para tener todo junto
-      const userWithToken = { ...userData, token };
-
-      // Guardamos en el estado y en localStorage
-      setUser(userWithToken);
-      localStorage.setItem('acople-user', JSON.stringify(userWithToken));
+      setUser(userData);
+      localStorage.setItem('acople-user', JSON.stringify(userData));
       
-      return true; // Login exitoso
+      return true;
     } catch (error) {
-      // Capturamos el mensaje de error que envía tu backend (ej: "Credenciales inválidas")
       const message = error.response?.data?.message || 'Error al iniciar sesión';
       console.error('Login error:', message);
-      alert(message); // Feedback simple para el usuario
-      return false; // Login fallido
+      alert("Credenciales incorrectas");
+      return false;
     }
   };
 
-  // Función de Registro conectada al Backend
+  // --- REGISTRO ADAPTADO A JAVA ---
   const register = async (name, email, password) => {
     try {
-      // El backend espera { name, email, password } y asigna rol 'customer' por defecto
-      const response = await api.post('/auth/register', { name, email, password });
+      // CORRECCIÓN 3: Adaptamos los campos al modelo User.java
+      // User.java tiene: username, email, password, role
+      const payload = {
+        username: name, // Usamos el nombre como username
+        email: email,
+        password: password,
+        role: 'customer' // Asignamos rol por defecto
+      };
 
-      const { user: userData, token } = response.data.data;
-      const userWithToken = { ...userData, token };
+      const response = await api.post('/auth/register', payload);
 
-      setUser(userWithToken);
-      localStorage.setItem('acople-user', JSON.stringify(userWithToken));
+      // Java devuelve el usuario creado directamente
+      const userData = response.data;
+
+      setUser(userData);
+      localStorage.setItem('acople-user', JSON.stringify(userData));
       
       return true;
     } catch (error) {
       const message = error.response?.data?.message || 'Error al registrarse';
       console.error('Register error:', message);
-      alert(message);
+      alert("Error al registrarse. Verifica que el usuario no exista.");
       return false;
     }
   };
@@ -81,11 +87,9 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('acople-user');
-    // Opcional: Redirigir al home si es necesario
     window.location.href = '/'; 
   };
 
-  // Función para actualizar datos locales (si editas perfil)
   const updateProfile = (updates) => {
     if (!user) return;
     const updatedUser = { ...user, ...updates };
@@ -97,11 +101,12 @@ export const AuthProvider = ({ children }) => {
     user,
     isLoading,
     login,
-    register, // Exponemos la nueva función register
+    register,
     logout,
     updateProfile,
     isLoggedIn: !!user,
-    isAdmin: user?.role === 'admin' // Helper útil para proteger rutas
+    // CORRECCIÓN 4: Validación de rol simple (Java devuelve string "admin" o "customer")
+    isAdmin: user?.role === 'admin' 
   };
 
   return (
