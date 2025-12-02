@@ -190,7 +190,7 @@ export const pokemonCards = [
 
 export const yugiohCards = [
   {
-    id: "droll-&-lock-bird",
+    id: "droll-and-lock-bird",
     nombre: "Droll & Lock Bird",
     imagen: drollAndLockBird,
     edicion: "1a edicion",

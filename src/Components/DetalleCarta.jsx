@@ -5,7 +5,7 @@ import "../styles/detalle-carta.css";
 
 const DetalleCarta = () => {
   const { id } = useParams();
-  const cartaRaw = allProducts.find((c) => c.id === id);
+  const cartaRaw = allProducts.find((c) => String(c.id) === id);
   const carta = cartaRaw && {
     ...cartaRaw,
     nombre: cartaRaw.nombre || cartaRaw.name || 'Sin nombre',
