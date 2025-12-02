@@ -3,7 +3,6 @@ import api from '../Api/axios';
 import { useAuth } from './AuthContext';
 
 const CartContext = createContext();
-
 export const useCart = () => useContext(CartContext);
 
 export const CartProvider = ({ children }) => {
@@ -13,16 +12,26 @@ export const CartProvider = ({ children }) => {
   const [toast, setToast] = useState({ visible: false, message: '' });
   const toastTimer = useRef(null);
 
+  // Debugging: Ver qué usuario tenemos realmente
+  useEffect(() => {
+    if (isLoggedIn) {
+      console.log("🔑 Usuario en CartContext:", user);
+      if (!user?.id) console.error("🚨 ERROR CRÍTICO: El usuario está logueado pero NO TIENE ID. El backend fallará.");
+    }
+  }, [user, isLoggedIn]);
+
   const isRemoteItem = (item) => {
     return item.fromBackend || (item.id && !isNaN(Number(item.id)));
   };
 
+  // --- 1. CARGA INICIAL ---
   useEffect(() => {
     const loadCart = async () => {
-      if (isLoggedIn && user?.id) {
+      // VALIDACIÓN ESTRICTA: Solo cargamos si user.id existe y es válido
+      if (isLoggedIn && user && user.id) {
         try {
           const response = await api.get(`/cart?userId=${user.id}`);
-          const remoteItems = response.data; 
+          const remoteItems = response.data || []; // Protección contra null
 
           const mappedRemoteItems = remoteItems.map(item => ({
             id: item.product.id,
@@ -44,11 +53,7 @@ export const CartProvider = ({ children }) => {
       } else {
         const raw = localStorage.getItem('carrito');
         if (raw) {
-          try {
-            setCart(JSON.parse(raw));
-          } catch {
-            setCart([]);
-          }
+          try { setCart(JSON.parse(raw)); } catch { setCart([]); }
         }
       }
     };
@@ -56,19 +61,18 @@ export const CartProvider = ({ children }) => {
     loadCart();
   }, [isLoggedIn, user]);
 
+  // Persistencia local (invitados)
   useEffect(() => {
     if (!isLoggedIn) {
       localStorage.setItem('carrito', JSON.stringify(cart));
     }
   }, [cart, isLoggedIn]);
 
-
-  // --- FUNCIONES DE ACCIÓN ---
-
+  // --- 2. AGREGAR ---
   const addToCart = async (producto, cantidad = 1, imagenManual) => {
     const esReal = producto.isBackend || !isNaN(Number(producto.id));
 
-    // Actualización Optimista
+    // Optimista
     const newCart = [...cart];
     const existingIdx = newCart.findIndex(item => item.id === producto.id);
 
@@ -85,16 +89,20 @@ export const CartProvider = ({ children }) => {
         fromBackend: esReal
       });
     }
-    
     setCart(newCart);
     setIsCartOpen(true);
     showToast('Agregado al carrito');
 
-    // Sincronización Backend
-    if (isLoggedIn && user?.id && esReal) {
+    // Sincronización Backend (PROTEGIDA)
+    if (isLoggedIn && esReal) {
+      if (!user || !user.id) {
+        console.error("❌ No se pudo guardar en servidor: Falta User ID", user);
+        return; // Abortamos para no causar error 404/400
+      }
+
       try {
         await api.post('/cart/items', {
-          userId: parseInt(user.id, 10), // FORZAMOS ENTERO
+          userId: parseInt(user.id, 10),
           productId: producto.id,
           quantity: cantidad
         });
@@ -104,6 +112,7 @@ export const CartProvider = ({ children }) => {
     }
   };
 
+  // --- 3. ELIMINAR ---
   const removeFromCart = async (indexOrId) => {
     let itemToRemove = null;
     let newCart = [...cart];
@@ -119,7 +128,7 @@ export const CartProvider = ({ children }) => {
     if (!itemToRemove) return;
     setCart(newCart);
 
-    if (isLoggedIn && user?.id && itemToRemove.fromBackend) {
+    if (isLoggedIn && itemToRemove.fromBackend && user?.id) {
       try {
         await api.delete(`/cart/items/${itemToRemove.id}?userId=${user.id}`);
       } catch (error) {
@@ -128,12 +137,11 @@ export const CartProvider = ({ children }) => {
     }
   };
 
+  // --- 4. CAMBIAR CANTIDAD ---
   const updateQtyBackend = async (item, newQty) => {
-      if (isLoggedIn && user?.id && item.fromBackend) {
+      if (isLoggedIn && item.fromBackend && user?.id) {
           try {
-            await api.put(`/cart/items/${item.id}?userId=${user.id}`, { 
-                quantity: newQty 
-            });
+            await api.put(`/cart/items/${item.id}?userId=${user.id}`, { quantity: newQty });
           } catch (e) { console.error(e); }
       }
   };
@@ -142,7 +150,6 @@ export const CartProvider = ({ children }) => {
     const newCart = [...cart];
     const item = newCart[index];
     if(!item) return;
-
     item.cantidad += 1;
     setCart(newCart);
     updateQtyBackend(item, item.cantidad);
@@ -152,7 +159,6 @@ export const CartProvider = ({ children }) => {
     const newCart = [...cart];
     const item = newCart[index];
     if(!item) return;
-
     if (item.cantidad > 1) {
       item.cantidad -= 1;
       setCart(newCart);
@@ -163,19 +169,15 @@ export const CartProvider = ({ children }) => {
   };
 
   const clearCart = async () => {
-    setCart([]);
-    showToast('Carrito vaciado');
-    
-    if (isLoggedIn && user?.id) {
-      try {
-        await api.delete(`/cart?userId=${user.id}`);
-      } catch (error) {
-        console.error("Error vaciando carrito remoto:", error);
+      setCart([]);
+      showToast('Carrito vaciado');
+      if (isLoggedIn && user?.id) {
+          try { await api.delete(`/cart?userId=${user.id}`); } 
+          catch (error) { console.error("Error vaciando carrito:", error); }
       }
-    }
   };
 
-  // --- UTILIDADES ---
+  // Utilidades
   const getTotal = () => cart.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
   const getQuantity = () => cart.reduce((acc, item) => acc + item.cantidad, 0);
   const openCart = () => setIsCartOpen(true);
@@ -185,9 +187,7 @@ export const CartProvider = ({ children }) => {
   const showToast = (msg) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ visible: true, message: msg });
-    toastTimer.current = setTimeout(() => {
-      setToast({ visible: false, message: '' });
-    }, 2000);
+    toastTimer.current = setTimeout(() => setToast({ visible: false, message: '' }), 2000);
   };
   const closeToast = () => setToast({ visible: false, message: '' });
 
