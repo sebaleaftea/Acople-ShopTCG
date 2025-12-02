@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import api from '../Api/axios';
 import { useAuth } from './AuthContext';
@@ -14,34 +13,26 @@ export const CartProvider = ({ children }) => {
   const [toast, setToast] = useState({ visible: false, message: '' });
   const toastTimer = useRef(null);
 
-  // Helper para identificar si un producto viene del backend (Java usa IDs numéricos)
-  // Si el ID es un número (o string numérico), asumimos que es del backend.
-  // Si es un string como "black-lotus", es estático.
   const isRemoteItem = (item) => {
     return item.fromBackend || (item.id && !isNaN(Number(item.id)));
   };
 
-  // --- LÓGICA DE CARGA INICIAL ---
   useEffect(() => {
     const loadCart = async () => {
       if (isLoggedIn && user?.id) {
-        // MODO CONECTADO: Cargar desde Backend Java
         try {
-          // Endpoint Java: GET /api/cart?userId=...
           const response = await api.get(`/cart?userId=${user.id}`);
-          const remoteItems = response.data; // Java devuelve array directo de CartItems
+          const remoteItems = response.data; 
 
           const mappedRemoteItems = remoteItems.map(item => ({
-            id: item.product.id, // ID del producto en BD
+            id: item.product.id,
             nombre: item.product.name,
             precio: item.product.price,
-            // Usamos la imagen que venga del backend, o placeholder si no hay
             imagen: item.product.image || "https://placehold.co/100x100?text=Sin+Foto",
             cantidad: item.quantity,
             fromBackend: true
           }));
 
-          // FUSIÓN: Combinamos con los items estáticos locales que no existen en el backend
           setCart(prev => {
              const localStaticItems = prev.filter(p => !isRemoteItem(p));
              return [...mappedRemoteItems, ...localStaticItems];
@@ -51,7 +42,6 @@ export const CartProvider = ({ children }) => {
           console.error("Error cargando carrito remoto:", error);
         }
       } else {
-        // MODO INVITADO: Cargar desde LocalStorage
         const raw = localStorage.getItem('carrito');
         if (raw) {
           try {
@@ -66,7 +56,6 @@ export const CartProvider = ({ children }) => {
     loadCart();
   }, [isLoggedIn, user]);
 
-  // Persistencia Local (Solo para invitados o respaldo de estáticos)
   useEffect(() => {
     if (!isLoggedIn) {
       localStorage.setItem('carrito', JSON.stringify(cart));
@@ -77,11 +66,9 @@ export const CartProvider = ({ children }) => {
   // --- FUNCIONES DE ACCIÓN ---
 
   const addToCart = async (producto, cantidad = 1, imagenManual) => {
-    // Detectamos si es un producto real para sincronizarlo
-    // En Java los IDs son números, en el estático son strings
     const esReal = producto.isBackend || !isNaN(Number(producto.id));
 
-    // 1. Actualización Optimista
+    // Actualización Optimista
     const newCart = [...cart];
     const existingIdx = newCart.findIndex(item => item.id === producto.id);
 
@@ -103,13 +90,11 @@ export const CartProvider = ({ children }) => {
     setIsCartOpen(true);
     showToast('Agregado al carrito');
 
-    // 2. Sincronización con Backend Java
+    // Sincronización Backend
     if (isLoggedIn && user?.id && esReal) {
       try {
-        // Endpoint Java: POST /api/cart/items
-        // Body: { userId, productId, quantity }
         await api.post('/cart/items', {
-          userId: user.id,
+          userId: parseInt(user.id, 10), // FORZAMOS ENTERO
           productId: producto.id,
           quantity: cantidad
         });
@@ -136,7 +121,6 @@ export const CartProvider = ({ children }) => {
 
     if (isLoggedIn && user?.id && itemToRemove.fromBackend) {
       try {
-        // Endpoint Java: DELETE /api/cart/items/{productId}?userId=...
         await api.delete(`/cart/items/${itemToRemove.id}?userId=${user.id}`);
       } catch (error) {
         console.error("Error eliminando item:", error);
@@ -147,8 +131,6 @@ export const CartProvider = ({ children }) => {
   const updateQtyBackend = async (item, newQty) => {
       if (isLoggedIn && user?.id && item.fromBackend) {
           try {
-            // Endpoint Java: PUT /api/cart/items/{productId}?userId=...
-            // Body: { quantity: newQty }
             await api.put(`/cart/items/${item.id}?userId=${user.id}`, { 
                 quantity: newQty 
             });
@@ -186,7 +168,6 @@ export const CartProvider = ({ children }) => {
     
     if (isLoggedIn && user?.id) {
       try {
-        // Endpoint Java: DELETE /api/cart?userId=...
         await api.delete(`/cart?userId=${user.id}`);
       } catch (error) {
         console.error("Error vaciando carrito remoto:", error);

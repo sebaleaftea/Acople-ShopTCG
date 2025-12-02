@@ -3,7 +3,7 @@ import { useCart } from "../contexts/useCart";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../contexts/AuthContext";
-import api from "../Api/axios"; // Aseguramos la ruta correcta con Mayúscula si tu carpeta es Api
+import api from "../Api/axios"; 
 import { useLoading } from "../contexts/useLoading";
 import "../styles/home.css";
 
@@ -25,8 +25,6 @@ const DetalleCompra = () => {
     const taxes = Math.round(total * 0.19);
     const finalTotal = total + shipping + taxes;
 
-    // CORRECCIÓN: Eliminamos el argumento 'data' o '_data' completamente.
-    // Al no declararlo, ESLint ya no marca error de variable no usada.
     const onSubmit = async () => {
         // 1. Validación de Sesión
         if (!user || !user.id) {
@@ -52,10 +50,12 @@ const DetalleCompra = () => {
 
         try {
             // BACKEND JAVA: POST /api/orders
-            // Enviamos solo el userId, el backend se encarga del resto
-            const response = await api.post('/orders', {
-                userId: user.id
-            });
+            // Convertimos user.id a entero para cumplir con Map<String, Long>
+            const payload = {
+                userId: parseInt(user.id, 10)
+            };
+
+            const response = await api.post('/orders', payload);
 
             if (response.status === 200 || response.status === 201) {
                 // Éxito
