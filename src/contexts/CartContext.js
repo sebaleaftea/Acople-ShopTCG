@@ -12,35 +12,39 @@ export const CartProvider = ({ children }) => {
   const [toast, setToast] = useState({ visible: false, message: '' });
   const toastTimer = useRef(null);
 
-  // Debugging: Ver qué usuario tenemos realmente
-  useEffect(() => {
-    if (isLoggedIn) {
-      console.log("🔑 Usuario en CartContext:", user);
-      if (!user?.id) console.error("🚨 ERROR CRÍTICO: El usuario está logueado pero NO TIENE ID. El backend fallará.");
-    }
-  }, [user, isLoggedIn]);
-
   const isRemoteItem = (item) => {
     return item.fromBackend || (item.id && !isNaN(Number(item.id)));
   };
 
-  // --- 1. CARGA INICIAL ---
+  // --- 1. CARGA INICIAL (Con Logs de Depuración) ---
   useEffect(() => {
     const loadCart = async () => {
-      // VALIDACIÓN ESTRICTA: Solo cargamos si user.id existe y es válido
+      // Verificamos explícitamente que el ID sea válido antes de llamar
       if (isLoggedIn && user && user.id) {
+        console.log("🛒 Intentando cargar carrito para User ID:", user.id);
+        
         try {
-          const response = await api.get(`/cart?userId=${user.id}`);
-          const remoteItems = response.data || []; // Protección contra null
+          // CAMBIO CLAVE: Usamos 'params' para que Axios construya la URL segura
+          // Esto evita errores si el ID es string o número
+          const response = await api.get('/cart', { 
+            params: { userId: user.id } 
+          });
+          
+          const remoteItems = response.data || [];
 
-          const mappedRemoteItems = remoteItems.map(item => ({
-            id: item.product.id,
-            nombre: item.product.name,
-            precio: item.product.price,
-            imagen: item.product.image || "https://placehold.co/100x100?text=Sin+Foto",
-            cantidad: item.quantity,
-            fromBackend: true
-          }));
+          const mappedRemoteItems = remoteItems.map(item => {
+             // Protección extra por si el producto es nulo en la BD
+             if (!item.product) return null;
+             
+             return {
+                id: item.product.id,
+                nombre: item.product.name,
+                precio: item.product.price,
+                imagen: item.product.image || "https://placehold.co/100x100?text=Sin+Foto",
+                cantidad: item.quantity,
+                fromBackend: true
+             };
+          }).filter(Boolean);
 
           setCart(prev => {
              const localStaticItems = prev.filter(p => !isRemoteItem(p));
@@ -48,9 +52,14 @@ export const CartProvider = ({ children }) => {
           });
 
         } catch (error) {
-          console.error("Error cargando carrito remoto:", error);
+          console.error("❌ Error cargando carrito remoto:", error);
+          // Si es 400, imprime detalles para depurar
+          if (error.response?.status === 400) {
+             console.error("Detalle del error 400:", error.response.data);
+          }
         }
       } else {
+        // Carga local
         const raw = localStorage.getItem('carrito');
         if (raw) {
           try { setCart(JSON.parse(raw)); } catch { setCart([]); }
@@ -61,14 +70,14 @@ export const CartProvider = ({ children }) => {
     loadCart();
   }, [isLoggedIn, user]);
 
-  // Persistencia local (invitados)
+  // Persistencia local
   useEffect(() => {
     if (!isLoggedIn) {
       localStorage.setItem('carrito', JSON.stringify(cart));
     }
   }, [cart, isLoggedIn]);
 
-  // --- 2. AGREGAR ---
+  // --- 2. AGREGAR AL CARRITO ---
   const addToCart = async (producto, cantidad = 1, imagenManual) => {
     const esReal = producto.isBackend || !isNaN(Number(producto.id));
 
@@ -93,21 +102,23 @@ export const CartProvider = ({ children }) => {
     setIsCartOpen(true);
     showToast('Agregado al carrito');
 
-    // Sincronización Backend (PROTEGIDA)
+    // Sincronización
     if (isLoggedIn && esReal) {
       if (!user || !user.id) {
-        console.error("❌ No se pudo guardar en servidor: Falta User ID", user);
-        return; // Abortamos para no causar error 404/400
+         console.error("⚠️ No se puede sincronizar: Usuario sin ID");
+         return;
       }
 
       try {
+        console.log("📤 Enviando al backend:", { userId: user.id, productId: producto.id, quantity: cantidad });
+        
         await api.post('/cart/items', {
-          userId: parseInt(user.id, 10),
+          userId: user.id, // Axios enviará esto como JSON body correctamente
           productId: producto.id,
           quantity: cantidad
         });
       } catch (error) {
-        console.error("Error sincronizando add:", error);
+        console.error("❌ Error sincronizando add:", error);
       }
     }
   };
@@ -130,18 +141,23 @@ export const CartProvider = ({ children }) => {
 
     if (isLoggedIn && itemToRemove.fromBackend && user?.id) {
       try {
-        await api.delete(`/cart/items/${itemToRemove.id}?userId=${user.id}`);
+        // DELETE con query param seguro
+        await api.delete(`/cart/items/${itemToRemove.id}`, {
+            params: { userId: user.id }
+        });
       } catch (error) {
         console.error("Error eliminando item:", error);
       }
     }
   };
 
-  // --- 4. CAMBIAR CANTIDAD ---
+  // --- 4. ACTUALIZAR CANTIDAD ---
   const updateQtyBackend = async (item, newQty) => {
       if (isLoggedIn && item.fromBackend && user?.id) {
           try {
-            await api.put(`/cart/items/${item.id}?userId=${user.id}`, { quantity: newQty });
+            await api.put(`/cart/items/${item.id}`, { quantity: newQty }, {
+                params: { userId: user.id }
+            });
           } catch (e) { console.error(e); }
       }
   };
@@ -172,8 +188,9 @@ export const CartProvider = ({ children }) => {
       setCart([]);
       showToast('Carrito vaciado');
       if (isLoggedIn && user?.id) {
-          try { await api.delete(`/cart?userId=${user.id}`); } 
-          catch (error) { console.error("Error vaciando carrito:", error); }
+          try { 
+              await api.delete('/cart', { params: { userId: user.id } }); 
+          } catch (error) { console.error("Error vaciando carrito:", error); }
       }
   };
 
