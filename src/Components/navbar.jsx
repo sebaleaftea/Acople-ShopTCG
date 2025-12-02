@@ -38,6 +38,9 @@ export default function AppNavbar() {
             <div className="nav-center">
               <li><Link to="/" data-nav>Inicio</Link></li>
               <li><Link to="/all-products" data-nav>Productos</Link></li>
+              {isLoggedIn && (
+                <li><Link to="/historial" data-nav>Historial de Compras</Link></li>
+              )}
               <li><Link to="/blog" data-nav>Guía & Estrategias</Link></li>
             </div>
             <div className="nav-right">

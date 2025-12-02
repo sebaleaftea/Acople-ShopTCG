@@ -10,6 +10,7 @@ import Configuracion from "../Pages/Configuracion";
 import Productos from "../Pages/productosAcople";
 import AllProducts from "../Pages/allProducts";
 import AdminDashboard from "../Pages/AdminDashboard";
+import HistorialCompras from "../Pages/HistorialCompras";
 
 const AppRouter = () => {
   return (
@@ -25,6 +26,7 @@ const AppRouter = () => {
       <Route path="/tienda" element={<Tienda />} />
       <Route path="/productos-acople" element={<Productos />} />
       <Route path="/all-products" element={<AllProducts />} />
+      <Route path="/historial" element={<HistorialCompras />} />
       <Route path="/perfil" element={<Perfil />} />
       <Route path="/configuracion" element={<Configuracion />} />
     </Routes>
