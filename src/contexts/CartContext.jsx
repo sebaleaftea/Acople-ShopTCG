@@ -8,7 +8,7 @@ const CartContext = createContext();
 export const useCart = () => useContext(CartContext);
 
 export const CartProvider = ({ children }) => {
-  const { isLoggedIn } = useAuth();
+  const { user, isLoggedIn } = useAuth();
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '' });
@@ -20,35 +20,42 @@ export const CartProvider = ({ children }) => {
   // --- LÓGICA DE CARGA INICIAL ---
   useEffect(() => {
     const loadCart = async () => {
-      if (isLoggedIn) {
-        // MODO CONECTADO: Cargar desde Backend
+      // Solo cargar si estamos logueados Y tenemos un ID de usuario
+      if (isLoggedIn && user?.id) { 
         try {
-          const response = await api.get('/cart');
-          const remoteCart = response.data.data;
+          // Backend Java espera el `userId` como query param
+          const response = await api.get('/cart', {
+            params: { userId: user.id }
+          });
+
+          // La data puede venir en `response.data` directamente
+          const remoteCartItems = response.data || [];
 
           // Mapeamos la respuesta del backend a la estructura del frontend
-          const mappedItems = remoteCart.items.map(item => {
-             if (!item.productId) return null;
+          const mappedItems = remoteCartItems.map(item => {
+             if (!item.product) return null;
              return {
-              id: item.productId._id,
-              nombre: item.productId.name,
-              precio: item.productId.price,
-              imagen: item.productId.images?.[0]?.url || "https://placehold.co/100x100?text=Sin+Foto",
+              id: item.product.id, // Usamos el ID del producto
+              nombre: item.product.name,
+              precio: item.product.price,
+              // Asumimos que no viene la imagen en la respuesta del carrito
+              imagen: "https://placehold.co/100x100?text=Desde+BD", 
               cantidad: item.quantity,
               fromBackend: true
             };
           }).filter(Boolean);
 
-          // Combinamos con items locales que NO sean del backend (los estáticos)
-          setCart(prev => {
-             const localStaticItems = prev.filter(p => !isMongoId(p.id));
-             return [...mappedItems, ...localStaticItems];
-          });
+          setCart(mappedItems);
 
         } catch (error) {
-          console.error("Error cargando carrito remoto:", error);
+          // Si el carrito está vacío en el backend, puede dar 404, lo cual es normal.
+          if (error.response?.status === 404) {
+            setCart([]); // Nos aseguramos que el carrito local esté vacío
+          } else {
+            console.error("Error cargando carrito remoto:", error);
+          }
         }
-      } else {
+      } else if (!isLoggedIn) {
         // MODO INVITADO: Cargar desde LocalStorage
         const raw = localStorage.getItem('carrito');
         if (raw) {
@@ -62,7 +69,7 @@ export const CartProvider = ({ children }) => {
     };
 
     loadCart();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, user?.id]);
 
   // Persistencia en LocalStorage (Solo para invitados o respaldo)
   useEffect(() => {
@@ -104,14 +111,17 @@ export const CartProvider = ({ children }) => {
     showToast('Agregado al carrito');
 
     // 3. Sincronización con Backend
-    if (isLoggedIn && esProductoReal) {
+    if (isLoggedIn && esProductoReal && user?.id) {
       try {
+        // Backend Java espera `userId`, `productId`, `quantity`
         await api.post('/cart/items', {
+          userId: user.id,
           productId: producto.id,
           quantity: cantidad
         });
       } catch (error) {
         console.error("Error sincronizando add:", error);
+        // Opcional: Revertir la actualización optimista si falla
       }
     }
   };
@@ -131,9 +141,12 @@ export const CartProvider = ({ children }) => {
     if (!itemToRemove) return;
     setCart(newCart);
 
-    if (isLoggedIn && isMongoId(itemToRemove.id)) {
+    if (isLoggedIn && user?.id && itemToRemove?.id) {
       try {
-        await api.delete(`/cart/items/${itemToRemove.id}`);
+        // Backend Java espera `userId` como query param
+        await api.delete(`/cart/items/${itemToRemove.id}`, {
+          params: { userId: user.id }
+        });
       } catch (error) {
         console.error("Error eliminando item:", error);
       }
@@ -148,11 +161,13 @@ export const CartProvider = ({ children }) => {
     item.cantidad += 1;
     setCart(newCart);
 
-    if (isLoggedIn && isMongoId(item.id)) {
+    if (isLoggedIn && user?.id && item?.id) {
       try {
-        await api.put(`/cart/items/${item.id}`, {
-          quantity: item.cantidad
-        });
+        // Backend Java espera `userId` como query param
+        await api.put(`/cart/items/${item.id}`, 
+          { quantity: item.cantidad },
+          { params: { userId: user.id } }
+        );
       } catch (error) {
         console.error("Error incrementando:", error);
       }
@@ -168,17 +183,19 @@ export const CartProvider = ({ children }) => {
       item.cantidad -= 1;
       setCart(newCart);
 
-      if (isLoggedIn && isMongoId(item.id)) {
+      if (isLoggedIn && user?.id && item?.id) {
         try {
-          await api.put(`/cart/items/${item.id}`, {
-            quantity: item.cantidad
-          });
+          // Backend Java espera `userId` como query param
+          await api.put(`/cart/items/${item.id}`, 
+            { quantity: item.cantidad },
+            { params: { userId: user.id } }
+          );
         } catch (error) {
           console.error("Error decrementando:", error);
         }
       }
     } else {
-      removeFromCart(index);
+      removeFromCart(index); // Esto ya maneja la sincronización
     }
   };
 
@@ -186,9 +203,12 @@ export const CartProvider = ({ children }) => {
     setCart([]);
     showToast('Carrito vaciado');
 
-    if (isLoggedIn) {
+    if (isLoggedIn && user?.id) {
       try {
-        await api.delete('/cart');
+        // Backend Java espera `userId` como query param
+        await api.delete('/cart', { 
+          params: { userId: user.id } 
+        });
       } catch (error) {
         console.error("Error vaciando carrito remoto:", error);
       }
