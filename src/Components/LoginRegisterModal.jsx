@@ -111,7 +111,7 @@ const LoginRegisterModal = ({ isOpen, onClose }) => {
               <div className="form-group">
                 <label htmlFor="login-email">Email</label>
                 <input
-                  type="email"
+                  type="text"
                   id="login-email"
                   name="email"
                   value={formData.email}

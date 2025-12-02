@@ -3,7 +3,7 @@ import { useCart } from "../contexts/useCart";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../contexts/AuthContext";
-import api from "../Api/axios"; 
+import api from "../Api/axios"; // Aseguramos la ruta correcta con Mayúscula si tu carpeta es Api
 import { useLoading } from "../contexts/useLoading";
 import "../styles/home.css";
 
@@ -25,7 +25,9 @@ const DetalleCompra = () => {
     const taxes = Math.round(total * 0.19);
     const finalTotal = total + shipping + taxes;
 
-    const onSubmit = async (data) => {
+    // CORRECCIÓN: Eliminamos el argumento 'data' o '_data' completamente.
+    // Al no declararlo, ESLint ya no marca error de variable no usada.
+    const onSubmit = async () => {
         // 1. Validación de Sesión
         if (!user || !user.id) {
             alert('Debes iniciar sesión para procesar la compra.');
@@ -33,7 +35,6 @@ const DetalleCompra = () => {
         }
 
         // 2. Validación de Productos Reales (Backend Java)
-        // Verificamos si hay items que vengan del backend (flag fromBackend o ID numérico)
         const hasBackendItems = cart.some(i => i.fromBackend || !isNaN(Number(i.id)));
         
         if (!hasBackendItems && cart.length > 0) {
@@ -51,29 +52,24 @@ const DetalleCompra = () => {
 
         try {
             // BACKEND JAVA: POST /api/orders
-            // Espera un mapa con userId: { "userId": 123 }
-            // (El backend lee los items directamente de la tabla 'cart_item' en la BD)
-            
+            // Enviamos solo el userId, el backend se encarga del resto
             const response = await api.post('/orders', {
                 userId: user.id
             });
 
             if (response.status === 200 || response.status === 201) {
                 // Éxito
-                await clearCart(); // Limpiar estado local y remoto (backend también lo limpia, pero sincronizamos)
+                await clearCart(); 
                 
                 showLoading({ message: "¡Compra exitosa! Redirigiendo...", duration: 2000 });
                 setTimeout(() => {
-                    navigate('/perfil'); // Enviar a "Mis Pedidos" (Perfil)
+                    navigate('/perfil'); 
                 }, 2000);
             }
 
         } catch (error) {
             console.error('Error en checkout:', error);
-            // Manejo de errores específicos del backend Java
-            // Java suele devolver un mensaje en error.response.data (si es string) o .message
             const msg = error.response?.data?.message || error.response?.data || 'Hubo un error al procesar tu pedido.';
-            
             alert(`Error: ${msg}`);
             showLoading({ active: false }); 
         }
@@ -112,7 +108,7 @@ const DetalleCompra = () => {
                             </div>
                         </section>
 
-                        {/* Shipping Form (Visual Only for Java Backend MVP) */}
+                        {/* Shipping Form */}
                         {deliveryMethod === 'delivery' && (
                             <section className="checkout-section">
                                 <h2 className="section-title">Dirección de Envío</h2>
@@ -127,10 +123,10 @@ const DetalleCompra = () => {
                                         {errors.fullName && <span className="error-message">{errors.fullName.message}</span>}
                                     </div>
                                     <div className="form-group">
-                                        <label>Email</label>
+                                        <label>Email / Usuario</label>
                                         <input
-                                            type="email"
-                                            {...register('email', { required: 'Email es requerido' })}
+                                            type="text"
+                                            {...register('email', { required: 'Este campo es requerido' })}
                                             className={errors.email ? 'error' : ''}
                                         />
                                         {errors.email && <span className="error-message">{errors.email.message}</span>}
@@ -270,7 +266,6 @@ const DetalleCompra = () => {
                                             <h4 className="order-item-name">{String(item.nombre)}</h4>
                                             <span className="order-item-price">${Number(item.precio || 0).toLocaleString()} CLP</span>
                                             
-                                            {/* Warning para items demo */}
                                             {!item.fromBackend && isNaN(Number(item.id)) && (
                                                 <small style={{color: 'orange', fontSize: '0.75rem'}}>*Item Demo (No se procesará)</small>
                                             )}
