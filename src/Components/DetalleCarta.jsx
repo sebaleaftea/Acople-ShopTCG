@@ -1,11 +1,13 @@
 import React from "react";
 import { useParams } from "react-router-dom";
 import { allProducts } from "../data/products";
+import { allCards } from "../data/cards";
 import "../styles/detalle-carta.css";
 
 const DetalleCarta = () => {
   const { id } = useParams();
-  const cartaRaw = allProducts.find((c) => String(c.id) === id);
+  const allItems = [...allProducts, ...allCards];
+  const cartaRaw = allItems.find((c) => String(c.id) === id);
   const carta = cartaRaw && {
     ...cartaRaw,
     nombre: cartaRaw.nombre || cartaRaw.name || 'Sin nombre',
