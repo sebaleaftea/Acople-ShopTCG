@@ -11,6 +11,8 @@ const CardPreview = ({ card }) => {
   const precio = Number(card.precio || card.price || 0);
   const rareza = card.rareza || card.rarity || "-";
   const edicion = card.edicion || card.edition || "-";
+  const stock = card.stock || 0;
+  const isOutOfStock = stock <= 0;
 
   // Lógica visual de descuentos
   const hasDiscount = card.id && (String(card.id).includes('black') || String(card.id).includes('blue'));
@@ -24,7 +26,7 @@ const CardPreview = ({ card }) => {
   };
 
   return (
-    <article className="card">
+    <article className={`card ${isOutOfStock ? 'out-of-stock' : ''}`}>
       {hasDiscount && <div className="discount-badge">Save {discountPercent}%</div>}
       <Link
         to={`/detalle-carta/${card.id}`}
@@ -43,7 +45,13 @@ const CardPreview = ({ card }) => {
         {oldPrice && <span className="old">${oldPrice.toLocaleString()}</span>}
       </div>
       <div className="stars">★★★★☆</div>
-      <button onClick={handleAddToCart}>Add to Cart</button>
+      <button
+        onClick={handleAddToCart}
+        disabled={isOutOfStock}
+        className={isOutOfStock ? 'btn-disabled' : ''}
+      >
+        {isOutOfStock ? 'Agotado' : 'Add to Cart'}
+      </button>
     </article>
   );
 };

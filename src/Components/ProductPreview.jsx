@@ -12,6 +12,8 @@ const ProductPreview = (props) => {
   const imagen = item.imagen || item.image || "https://placehold.co/300x400?text=No+Image";
   const precio = Number(item.precio ?? item.price ?? 0);
   const categoria = item.category || item.categoria || (item.productType === 'accesorio' ? (item.category || 'accesorio') : undefined);
+  const stock = item.stock || 0;
+  const isOutOfStock = stock <= 0;
 
   // Lógica visual de descuentos
   const hasDiscount = categoria && (categoria === 'dados' || categoria === 'portamazos');
@@ -28,7 +30,7 @@ const ProductPreview = (props) => {
   const categoryClass = categoria ? `card--cat-${categoria}` : '';
 
   return (
-    <article className={`card ${isAccessory ? 'card--accessory' : ''} ${categoryClass}`}>
+    <article className={`card ${isAccessory ? 'card--accessory' : ''} ${categoryClass} ${isOutOfStock ? 'out-of-stock' : ''}`}>
       {hasDiscount && <div className="discount-badge">Save {discountPercent}%</div>}
       <Link
         to={`/detalle-carta/${item.id}`}
@@ -46,7 +48,13 @@ const ProductPreview = (props) => {
         {oldPrice && <span className="old">${oldPrice.toLocaleString()}</span>}
       </div>
       <div className="stars">★★★★☆</div>
-      <button onClick={handleAddToCart}>Add to Cart</button>
+      <button
+        onClick={handleAddToCart}
+        disabled={isOutOfStock}
+        className={isOutOfStock ? 'btn-disabled' : ''}
+      >
+        {isOutOfStock ? 'Agotado' : 'Add to Cart'}
+      </button>
     </article>
   );
 };

@@ -43,7 +43,8 @@ const AdminDashboard = () => {
         precio: p.price,
         descripcion: p.description,
         category: p.category,
-        game: p.game
+        game: p.game,
+        isEditing: false
       }));
       
       setRows(backendProducts);
@@ -122,6 +123,7 @@ const AdminDashboard = () => {
       };
 
       await api.put(`/products/${id}`, payload);
+      toggleEdit(id); // Salir del modo edición después de guardar
       alert('Actualizado correctamente');
     } catch (err) {
       console.error(err);
@@ -158,6 +160,11 @@ const AdminDashboard = () => {
     }));
   };
 
+  // Función para alternar modo edición
+  const toggleEdit = (id) => {
+    setRows(prev => prev.map(r => r.id === id ? { ...r, isEditing: !r.isEditing } : r));
+  };
+
   // Generador automático de slug basado en el nombre
   const handleNameChange = (e) => {
     const val = e.target.value;
@@ -173,7 +180,7 @@ const AdminDashboard = () => {
     <main className="admin-main">
       <header className="admin-header">
         <h1 className="admin-title">Panel de Administración</h1>
-        <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
+        <div className="admin-header-info">
             <span>{user?.email || user?.username}</span>
             <button onClick={logout} className="admin-logout-btn">
             Cerrar sesión
@@ -185,7 +192,7 @@ const AdminDashboard = () => {
 
       <section className="admin-card">
         <div className="admin-toolbar">
-          <h2 className="admin-section-title" style={{ margin: 0 }}>
+          <h2 className="admin-section-title admin-section-title-margin">
             Inventario (Backend Java)
           </h2>
           <button className="admin-btn-secondary" onClick={() => setIsAddOpen(true)}>
@@ -200,29 +207,94 @@ const AdminDashboard = () => {
             <table className="admin-table">
                 <thead>
                 <tr>
-                    <th>Nombre / Slug</th>
-                    <th>Detalles</th>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Slug</th>
+                    <th>Descripción</th>
+                    <th>Juego/Categoría</th>
                     <th>Stock</th>
-                    <th>Precio (CLP)</th>
+                    <th>Precio</th>
                     <th>Acciones</th>
                 </tr>
                 </thead>
                 <tbody>
                 {rows.length === 0 && (
-                    <tr><td colSpan="5" style={{textAlign: 'center', padding: '2rem'}}>No hay productos en la base de datos.</td></tr>
+                    <tr><td colSpan="8" style={{textAlign: 'center', padding: '2rem'}}>No hay productos en la base de datos.</td></tr>
                 )}
                 {rows.map(r => (
                     <tr key={r.id}>
+                    <td>{r.id}</td>
                     <td>
-                      <div style={{fontWeight: 'bold'}}>{r.nombre}</div>
-                      <div style={{fontSize: '0.8em', color: '#aaa'}}>{r.slug}</div>
+                      {r.isEditing ? (
+                        <input
+                          type="text"
+                          value={r.nombre}
+                          onChange={(e) => handleLocalChange(r.id, 'nombre', e.target.value)}
+                          className="admin-input"
+                          style={{ width: '100%' }}
+                        />
+                      ) : (
+                        r.nombre
+                      )}
                     </td>
                     <td>
-                      <span style={{fontSize: '0.85em', background: '#333', padding: '2px 6px', borderRadius: '4px'}}>
-                        {r.game} / {r.category}
-                      </span>
+                      {r.isEditing ? (
+                        <input
+                          type="text"
+                          value={r.slug}
+                          onChange={(e) => handleLocalChange(r.id, 'slug', e.target.value)}
+                          className="admin-input"
+                          style={{ width: '100%', fontFamily: 'monospace' }}
+                        />
+                      ) : (
+                        r.slug
+                      )}
                     </td>
-                    
+                    <td>
+                      {r.isEditing ? (
+                        <input
+                          type="text"
+                          value={r.descripcion}
+                          onChange={(e) => handleLocalChange(r.id, 'descripcion', e.target.value)}
+                          className="admin-input"
+                          style={{ width: '100%' }}
+                        />
+                      ) : (
+                        r.descripcion
+                      )}
+                    </td>
+                    <td>
+                      {r.isEditing ? (
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <select
+                            value={r.game}
+                            onChange={(e) => handleLocalChange(r.id, 'game', e.target.value)}
+                            style={{ padding: '4px', borderRadius: '4px', background: '#333', color: '#fff', border: '1px solid #555' }}
+                          >
+                            <option value="magic">Magic</option>
+                            <option value="pokemon">Pokémon</option>
+                            <option value="yugioh">Yu-Gi-Oh!</option>
+                            <option value="accesorio">Accesorio</option>
+                          </select>
+                          <select
+                            value={r.category}
+                            onChange={(e) => handleLocalChange(r.id, 'category', e.target.value)}
+                            style={{ padding: '4px', borderRadius: '4px', background: '#333', color: '#fff', border: '1px solid #555' }}
+                          >
+                            <option value="single">Single</option>
+                            <option value="carpetas">Carpeta</option>
+                            <option value="dados">Dados</option>
+                            <option value="playmat">Playmat</option>
+                            <option value="portamazos">Portamazo</option>
+                            <option value="protectores">Protectores</option>
+                          </select>
+                        </div>
+                      ) : (
+                        <span style={{fontSize: '0.85em', background: '#333', padding: '2px 6px', borderRadius: '4px'}}>
+                          {r.game} / {r.category}
+                        </span>
+                      )}
+                    </td>
                     <td style={{ minWidth: 140 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <button className="admin-btn-outline" onClick={() => deltaStock(r.id, -1)}>-</button>
@@ -237,7 +309,6 @@ const AdminDashboard = () => {
                         <button className="admin-btn-outline" onClick={() => deltaStock(r.id, 1)}>+</button>
                         </div>
                     </td>
-
                     <td style={{ minWidth: 140 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span>$</span>
@@ -252,24 +323,44 @@ const AdminDashboard = () => {
                         />
                         </div>
                     </td>
-
                     <td>
                         <div style={{ display: 'flex', gap: 8 }}>
-                        <button
-                            className="admin-btn-secondary"
-                            onClick={() => saveRow(r.id)}
-                            disabled={savingId === r.id}
-                            title="Guardar Cambios"
-                        >
-                            {savingId === r.id ? '...' : '💾'}
-                        </button>
-                        <button
-                            className="admin-btn-outline"
-                            onClick={() => removeRow(r.id)}
-                            title="Eliminar"
-                        >
-                            🗑️
-                        </button>
+                        {r.isEditing ? (
+                          <>
+                            <button
+                                className="admin-btn-secondary"
+                                onClick={() => saveRow(r.id)}
+                                disabled={savingId === r.id}
+                                title="Guardar Cambios"
+                            >
+                                {savingId === r.id ? '...' : 'Guardar'}
+                            </button>
+                            <button
+                                className="admin-btn-outline"
+                                onClick={() => toggleEdit(r.id)}
+                                title="Cancelar"
+                            >
+                                Cancelar
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                                className="admin-btn-secondary"
+                                onClick={() => toggleEdit(r.id)}
+                                title="Editar"
+                            >
+                                Editar
+                            </button>
+                            <button
+                                className="admin-btn-outline"
+                                onClick={() => removeRow(r.id)}
+                                title="Eliminar"
+                            >
+                                🗑️
+                            </button>
+                          </>
+                        )}
                         </div>
                     </td>
                     </tr>

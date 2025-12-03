@@ -1,23 +1,21 @@
-# Update Modal Designs for Vibrant Neon Aesthetic
+# TODO: Implementar Cambios en Banner y AdminDashboard
 
-## 1. Auth Modal (Login/Register)
-- [ ] Add neon color variables to theme.css
-- [ ] Update modal background to diagonal gradient (#1a0033 → #0044ff)
-- [ ] Style tab active indicator with neon blue/purple and glow
-- [ ] Update buttons to neon gradient (#00e0ff → #bb00ff) with glow
-- [ ] Apply bold fonts (Bebas Neue/Poppins) with text-shadow
-- [ ] Add subtle animations for tab switching and hovers
+## 1. Actualizar CSS del Banner
+- [x] Modificar `header[role=banner]` en `src/styles/home.css`:
+  - Cambiar `background-size: cover` a `contain`
+  - Cambiar `background-position: center` a `center top`
+  - Agregar `background-color: #0d0d0d`
+  - Agregar `min-height: 600px`
 
-## 2. Address Modal
-- [ ] Style header with warm pink-orange gradient (#ff4e50 → #f9d423)
-- [ ] Update input fields: white bg, neon borders on focus
-- [ ] Style dropdowns consistently
-- [ ] Update "Guardar" button to pink-orange gradient
-- [ ] Update "Cancelar" button to plain white with soft border
-- [ ] Add glowing borders and shadows for interactive elements
-- [ ] Ensure responsive design and no overflow
+## 2. Refactorizar AdminDashboard.jsx
+- [x] Agregar propiedad `isEditing: false` a cada producto en el estado `rows`
+- [x] Actualizar estructura de la tabla con nuevas columnas: ID, Nombre, Slug, Descripción, Juego/Categoría, Stock, Precio, Acciones
+- [x] Implementar renderizado condicional: texto vs inputs/selects basado en `isEditing`
+- [x] Agregar función `toggleEdit(id)` para alternar modo edición
+- [x] Actualizar botones de acción: "Editar" (toggle), "Guardar" (API + toggle off), "Cancelar" (toggle off)
+- [x] Asegurar que la API de guardar envíe el objeto completo
+- [x] Manejar cambios locales en modo edición
 
-## 3. General
-- [ ] Verify responsive behavior on mobile
-- [ ] Test animations (fade, glow pulse)
-- [ ] Centralize reusable theme variables in theme.css
+## 3. Verificación
+- [ ] Probar cambios en banner: imagen completa, fondo oscuro, legibilidad
+- [ ] Probar AdminDashboard: toggle edición, guardar, cancelar, eliminar
