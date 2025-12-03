@@ -5,7 +5,7 @@ body, html {
 .detalle-carta-container {
     display: block;
     box-sizing: border-box;
-    max-width: 900px;
+    max-width: 1200px;
     margin: 2.5rem auto;
     background: #afd8eb;
     border-radius: 14px;
@@ -31,8 +31,8 @@ body, html {
 .detalle-carta-img {
     width: 100%;
     max-width: 320px;
-    border-radius: 12px;
-    box-shadow: 0 2px 12px #0002;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     background: #f8f8f8;
 }
 .detalle-carta-info-col {
