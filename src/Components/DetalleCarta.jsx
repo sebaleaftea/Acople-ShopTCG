@@ -121,42 +121,45 @@ const DetalleCarta = () => {
         </div>
         <div className="detalle-carta-info-col">
           <h1 className="detalle-carta-nombre">{product.name}</h1>
-          <p className="detalle-carta-precio">${Number(product.price).toLocaleString()}</p>
-          <span className={`detalle-carta-stock-badge ${isOutOfStock ? 'agotado' : 'disponible'}`}>
-            {isOutOfStock ? 'Agotado' : `Disponible (${stockVal} unidades)`}
-          </span>
+          <div className="detalle-carta-separator"></div>
+          <div className="detalle-carta-purchase-panel">
+            <p className="detalle-carta-precio">${Number(product.price).toLocaleString()}</p>
+            <span className={`detalle-carta-stock-badge ${isOutOfStock ? 'agotado' : 'disponible'}`}>
+              {isOutOfStock ? 'Agotado' : `Disponible (${stockVal} unidades)`}
+            </span>
+            <button
+              onClick={handleAddToCart}
+              disabled={isOutOfStock}
+              className={`detalle-carta-cta-btn ${isOutOfStock ? 'disabled' : ''}`}
+            >
+              {isOutOfStock ? 'Agotado' : 'Agregar al Carro'}
+            </button>
+          </div>
           <div className="detalle-carta-detalles">
             {product.productType === 'single' && (
               <>
                 <div className="detalle-carta-detalle-item">
-                  <i className="fas fa-dice"></i>
+                  <span className="detalle-carta-icon">🎲</span>
                   <span><strong>Juego:</strong> {product.game}</span>
                 </div>
                 <div className="detalle-carta-detalle-item">
-                  <i className="fas fa-tag"></i>
-                  <span><strong>Categoría:</strong> {product.rarity}</span>
+                  <span className="detalle-carta-icon">⚔️</span>
+                  <span><strong>Rareza:</strong> {product.rarity}</span>
                 </div>
                 <div className="detalle-carta-detalle-item">
-                  <i className="fas fa-calendar"></i>
+                  <span className="detalle-carta-icon">📜</span>
                   <span><strong>Edición:</strong> {product.edition}</span>
                 </div>
               </>
             )}
             {product.productType === 'accesorio' && (
               <div className="detalle-carta-detalle-item">
-                <i className="fas fa-cubes"></i>
+                <span className="detalle-carta-icon">🛡️</span>
                 <span><strong>Categoría:</strong> {product.category}</span>
               </div>
             )}
           </div>
           <p className="detalle-carta-descripcion">{product.description}</p>
-          <button
-            onClick={handleAddToCart}
-            disabled={isOutOfStock}
-            className={`detalle-carta-cta-btn ${isOutOfStock ? 'disabled' : ''}`}
-          >
-            {isOutOfStock ? 'Agotado' : 'Agregar al Carro'}
-          </button>
         </div>
       </div>
       {relatedProducts.length > 0 && (

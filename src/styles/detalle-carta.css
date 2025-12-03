@@ -1,17 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
+
 body, html {
     min-height: 100vh;
-    background: linear-gradient(135deg, #0a577a 0%, #2a4e92 30%, #9a48c9 100%);
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a0a2e 30%, #2a1b3d 70%, #0a0a0a 100%);
 }
+
 .detalle-carta-container {
     display: block;
     box-sizing: border-box;
     max-width: 1200px;
     margin: 2.5rem auto;
-    background: #afd8eb;
-    border-radius: 14px;
-    box-shadow: 0 4px 24px #88c9e722;
+    background: radial-gradient(circle at center, rgba(138, 43, 226, 0.1) 0%, rgba(25, 25, 112, 0.2) 50%, rgba(0, 0, 0, 0.8) 100%);
+    border: 2px solid rgba(255, 215, 0, 0.3);
+    border-radius: 20px;
+    box-shadow:
+        0 0 50px rgba(138, 43, 226, 0.3),
+        inset 0 0 50px rgba(0, 0, 0, 0.5);
     padding: 2.5rem 2rem;
+    position: relative;
 }
+
+.detalle-carta-container::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    background: linear-gradient(45deg, transparent, rgba(255, 215, 0, 0.1), transparent);
+    border-radius: 25px;
+    z-index: -1;
+    animation: arcaneGlow 3s ease-in-out infinite alternate;
+}
+
+@keyframes arcaneGlow {
+    0% { opacity: 0.3; }
+    100% { opacity: 0.7; }
+}
+
 .detalle-carta-flex {
     display: flex !important;
     flex-direction: row !important;
@@ -19,22 +45,36 @@ body, html {
     gap: 2.5rem;
     width: 100%;
 }
+
 .detalle-carta-img-col, .detalle-carta-info-col {
     box-sizing: border-box;
 }
+
 .detalle-carta-img-col {
     flex: 0 0 320px;
     display: flex;
     flex-direction: column;
     align-items: center;
 }
+
 .detalle-carta-img {
     width: 100%;
     max-width: 320px;
     border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    background: #f8f8f8;
+    border: 3px solid rgba(0, 191, 255, 0.6);
+    box-shadow:
+        0 0 20px rgba(0, 191, 255, 0.4),
+        0 0 40px rgba(138, 43, 226, 0.3),
+        0 0 60px rgba(255, 215, 0, 0.2);
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(25, 25, 112, 0.5));
+    animation: float 4s ease-in-out infinite;
 }
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
 .detalle-carta-info-col {
     flex: 1 1 0;
     display: flex;
@@ -42,52 +82,171 @@ body, html {
     gap: 1.2rem;
     min-width: 280px;
     max-width: 100%;
+    color: #ffffff;
 }
+
 .detalle-carta-nombre {
-    font-size: 2.1rem;
+    font-family: 'Cinzel', serif;
+    font-size: 2.8rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
-    color: #054263;
+    color: #ffd700;
+    text-shadow:
+        0 0 10px rgba(255, 215, 0, 0.8),
+        0 0 20px rgba(255, 215, 0, 0.6),
+        0 0 30px rgba(255, 215, 0, 0.4);
+    text-align: center;
 }
-.detalle-carta-info-list p {
-    margin: 0.2em 0;
-    font-size: 1.08rem;
+
+.detalle-carta-separator {
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.8), transparent);
+    position: relative;
+    margin: 1rem 0;
 }
+
+.detalle-carta-separator::after {
+    content: '✦';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    color: rgba(255, 215, 0, 0.9);
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+}
+
+.detalle-carta-purchase-panel {
+    background: rgba(25, 25, 112, 0.3);
+    border: 2px solid rgba(255, 215, 0, 0.5);
+    border-radius: 15px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    box-shadow:
+        0 0 20px rgba(138, 43, 226, 0.3),
+        inset 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.detalle-carta-precio {
+    font-family: 'Cinzel', serif;
+    font-size: 3rem;
+    font-weight: 700;
+    color: #ffd700;
+    text-shadow:
+        0 0 15px rgba(255, 215, 0, 0.9),
+        0 0 30px rgba(255, 215, 0, 0.7),
+        0 0 45px rgba(255, 215, 0, 0.5);
+    text-align: center;
+    margin: 0;
+}
+
+.detalle-carta-stock-badge {
+    font-size: 1.2rem;
+    font-weight: bold;
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    text-align: center;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.detalle-carta-stock-badge.disponible {
+    background: linear-gradient(135deg, #00ff7f, #00bfff);
+    color: #000;
+    border: 2px solid #00ff7f;
+    box-shadow:
+        0 0 15px rgba(0, 255, 127, 0.6),
+        inset 0 0 10px rgba(0, 191, 255, 0.3);
+}
+
+.detalle-carta-stock-badge.agotado {
+    background: linear-gradient(135deg, #dc143c, #696969);
+    color: #fff;
+    border: 2px solid #dc143c;
+    box-shadow:
+        0 0 15px rgba(220, 20, 60, 0.6),
+        inset 0 0 10px rgba(105, 105, 105, 0.3);
+}
+
+.detalle-carta-cta-btn {
+    background: linear-gradient(135deg, #ff4500, #8a2be2);
+    color: #ffffff;
+    border: 2px solid rgba(255, 215, 0, 0.8);
+    padding: 1rem 2rem;
+    border-radius: 10px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow:
+        0 0 20px rgba(255, 69, 0, 0.4),
+        0 0 40px rgba(138, 43, 226, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.detalle-carta-cta-btn:hover:not(.disabled) {
+    transform: translateY(-3px);
+    box-shadow:
+        0 0 30px rgba(255, 69, 0, 0.6),
+        0 0 60px rgba(138, 43, 226, 0.5),
+        0 0 90px rgba(255, 215, 0, 0.4);
+}
+
+.detalle-carta-cta-btn.disabled {
+    background: linear-gradient(135deg, #696969, #2f2f2f);
+    border-color: #696969;
+    cursor: not-allowed;
+    box-shadow: 0 0 10px rgba(105, 105, 105, 0.3);
+    color: #ccc;
+}
+
+.detalle-carta-detalles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.detalle-carta-detalle-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    color: #e0e0e0;
+}
+
+.detalle-carta-icon {
+    font-size: 1.5rem;
+}
+
 .detalle-carta-descripcion {
     margin-top: 1.2rem;
     font-size: 1.1rem;
-    color: #0e0101;
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 1rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
 }
+
 .detalle-carta-error {
-    color: #CC2936;
+    color: #ff6b6b;
     font-weight: bold;
     margin-top: 1.5rem;
+    text-shadow: 0 0 10px rgba(255, 107, 107, 0.8);
 }
-.add-to-cart-btn {
-    background-color: #054263;
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-    margin-top: 1rem;
-}
-.add-to-cart-btn:hover:not(.disabled) {
-    background-color: #0a577a;
-}
-.add-to-cart-btn.disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-    color: #666;
-}
+
 .loading {
     text-align: center;
     font-size: 1.2rem;
-    color: #054263;
+    color: #ffd700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
 }
+
 @media (max-width: 800px) {
     .detalle-carta-flex {
         flex-direction: column !important;
@@ -98,5 +257,14 @@ body, html {
     }
     .detalle-carta-img {
         max-width: 100%;
+    }
+    .detalle-carta-nombre {
+        font-size: 2.2rem;
+    }
+    .detalle-carta-precio {
+        font-size: 2.5rem;
+    }
+    .detalle-carta-detalles {
+        grid-template-columns: 1fr;
     }
 }
