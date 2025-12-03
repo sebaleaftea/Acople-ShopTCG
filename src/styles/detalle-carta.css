@@ -63,6 +63,31 @@ body, html {
     font-weight: bold;
     margin-top: 1.5rem;
 }
+.add-to-cart-btn {
+    background-color: #054263;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-top: 1rem;
+}
+.add-to-cart-btn:hover:not(.disabled) {
+    background-color: #0a577a;
+}
+.add-to-cart-btn.disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+    color: #666;
+}
+.loading {
+    text-align: center;
+    font-size: 1.2rem;
+    color: #054263;
+}
 @media (max-width: 800px) {
     .detalle-carta-flex {
         flex-direction: column !important;
